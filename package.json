@@ -6,7 +6,20 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["ecommerce", "api", "nodejs", "typescript"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SomoodMsleh/ecommerce-backend.git"
+  },
+  "keywords": [
+    "ecommerce",
+    "api",
+    "node.js",
+    "typescript"
+  ],
   "author": "Somood Musleh",
-  "license": "MIT"
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/SomoodMsleh/ecommerce-backend/issues"
+  },
+  "homepage": "https://github.com/SomoodMsleh/ecommerce-backend#readme"
 }
