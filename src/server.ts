@@ -1,8 +1,7 @@
 import app from './app.js'
 import dotenv from 'dotenv';
 import logger from './utils/logger.util.js';
-import connectDB from './config/database.js';
-import { error } from 'node:console';
+import connectDB from './config/database.config.js';
 dotenv.config();
 const PORT = process.env.PORT || 5000;
 const startServer  = async():Promise<void> => {
