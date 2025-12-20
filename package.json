@@ -5,9 +5,18 @@
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
-    "build": "tsc",
     "dev": "nodemon --exec tsx src/server.ts",
-    "start": "node dist/server.js"
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest --testPathPattern=tests/unit",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest --testPathPattern=tests/integration",
+    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "migrate": "tsx scripts/migrate.ts",
+    "seed": "tsx scripts/seed.ts"
   },
   "repository": {
     "type": "git",
@@ -78,5 +87,9 @@
     "speakeasy": "^2.0.0",
     "stripe": "^20.1.0",
     "winston": "^3.19.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   }
 }
