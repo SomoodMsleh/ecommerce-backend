@@ -2,7 +2,7 @@ import ApiError from "../utils/error.util.js";
 import { Request, Response, NextFunction } from "express";
 import logger from "../utils/logger.util.js";
 
-const errorMiddleware = async(err: Error, req: Request, res: Response, next: NextFunction): Promise<void> =>{
+const errorHandler = async(err: Error, req: Request, res: Response, next: NextFunction): Promise<void> =>{
     if (err instanceof ApiError){
         res.status(err.statusCode).json({
             success: false,
@@ -17,4 +17,4 @@ const errorMiddleware = async(err: Error, req: Request, res: Response, next: Nex
     }); // Handling generic errors
 }; //Global Error Handling Middleware
 
-export default errorMiddleware;
+export default errorHandler;
