@@ -26,8 +26,7 @@ export interface IUser extends Document {
     lastLogin ?: Date;
     createdAt: Date;
     updatedAt : Date;
-}
-
+}; 
 
 const userSchema: Schema<IUser> = new Schema({
     username:{
@@ -109,6 +108,6 @@ const userSchema: Schema<IUser> = new Schema({
 },{
     timestamps: true,
 });
-
-const userModel = mongoose.models.User || model<IUser>("User", userSchema);
+userSchema.index({email : 1}); // create index on email field for faster search
+const userModel = mongoose.models.User || model<IUser>("User", userSchema); // to avoid model overwrite issue in watch mode
 export default userModel;
