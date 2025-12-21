@@ -5,8 +5,8 @@ export interface IUser extends Document {
     firstName: string;
     lastName: string;
     email: string;
-    password ?: string; // optional property
-    phoneNumber?: string;
+    password : string; 
+    phoneNumber?: string; // optional property
     role: "customer" | "admin" | "vendor";
     isEmailVerified: boolean;
     isTwoFactorEnabled : boolean;
@@ -14,7 +14,7 @@ export interface IUser extends Document {
     googleId ?: string;
     facebookId ?: string;
     avatar ?: { url: string, publicId?: string };
-    addresses:Array<{
+    addresses ?: Array<{
         street: string;
         city: string;
         state: string;
@@ -62,6 +62,7 @@ const userSchema: Schema<IUser> = new Schema({
     password:{
         type: String,
         minlength: [6, "Password must be at least 6 characters"],
+        required: true,
         select: false // don`t return password field by default
     },
     phoneNumber: {
