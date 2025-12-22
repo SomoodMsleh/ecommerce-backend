@@ -5,6 +5,6 @@ const router = Router();
 
 router.post('/',asyncHandler(authController.register));
 router.post('/verifyEmail',asyncHandler(authController.isEmailVerified));
-
+router.post('/login',asyncHandler(authController.login));
 
 export default router;

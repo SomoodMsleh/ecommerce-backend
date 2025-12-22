@@ -1,11 +1,11 @@
 import userModel from "../models/User.model.js";
 import { sendEmail } from "./email.service.js";
-import {hashPassword } from "../utils/bcrypt.util.js";
+import {hashPassword ,comparePassword} from "../utils/bcrypt.util.js";
 import { generateToken, generateRefreshToken } from "../utils/jwt.util.js";
 import ApiError from "../utils/error.util.js";
 import {customAlphabet} from 'nanoid';
 import { verificationEmailTemplate , welcomeEmailTemplate} from "../emailTemplates/verificationEmailTemplate.js";
-
+import { Response } from "express";
 
 const VERIFICATION_CODE_LENGTH = 8;
 const VERIFICATION_CODE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
@@ -78,4 +78,39 @@ export const verifyEmail = async(verificationCode:string)=>{
             email : user.email,
             isEmailVerified: user.isEmailVerified
     }}
+};
+
+export const loginUser = async(res:Response ,email:string,password:string)=>{
+    const user = await userModel.findOne({email}).select('+password');
+    if (!user){
+        throw new ApiError("Invalid credentials",401);
+    }
+    if(!user.isActive){
+        throw new ApiError("Account is disabled",403);
+    }
+    if(!user.isEmailVerified){
+        throw new ApiError("Plz confirm your email",400);
+    }
+    const isPasswordValid = await comparePassword(password,user.password);
+    if(!isPasswordValid){
+        throw new ApiError("Invalid credentials",401);
+    }
+
+    user.lastLogin = Date.now();
+    await user.save();
+
+    const token = generateToken(res,{userId:user._id,role:user.role});
+    const refreshToken = await generateRefreshToken(res , user._id.toString());
+
+    return {
+        user:{
+            username:user.username,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            role: user.role,
+        },
+        token,
+        refreshToken
+    }
 };

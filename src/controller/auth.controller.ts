@@ -30,3 +30,15 @@ export const isEmailVerified = async (req: Request, res: Response, next: NextFun
     }
 };
 
+export const login = async (req:Request,res:Response,next:NextFunction) =>{
+    try{
+        const {email, password} = req.body;
+        if(!email || !password){
+            throw new ApiError("Email and password are required",400);
+        }
+        const result = await authServices.loginUser(res,email,password);
+        successResponse(res, 200, "Logged in successfully", result);
+    }catch(error){
+        next(error);
+    }
+};
