@@ -4,7 +4,7 @@ import {hashPassword } from "../utils/bcrypt.util.js";
 import { generateToken, generateRefreshToken } from "../utils/jwt.util.js";
 import ApiError from "../utils/error.util.js";
 import {customAlphabet} from 'nanoid';
-import { verificationEmailTemplate } from "../emailTemplates/verificationEmailTemplate.js";
+import { verificationEmailTemplate , welcomeEmailTemplate} from "../emailTemplates/verificationEmailTemplate.js";
 
 
 const VERIFICATION_CODE_LENGTH = 8;
@@ -43,14 +43,7 @@ export const registerUser = async(userData:RegisterUserInput)=>{
     userData.password = hashedPassword;
     const user = await userModel.create({...userData,verificationCode,verificationCodeExpiresAt});
     const html = verificationEmailTemplate.replace("{verificationCode}",verificationCode );
-    console.log("EMAIL_HOST =", process.env.EMAIL_HOST);
-    console.log("EMAIL_PORT =", process.env.EMAIL_PORT);
-    console.log("EMAIL_USER =", process.env.EMAIL_USER);
-    console.log("EMAIL_PASSWORD =", process.env.EMAIL_PASSWORD ? "OK" : "MISSING");
     await sendEmail({to:user.email,subject:'Verify your email',html});
-
-    const accessToken = generateToken({userId:user._id, role:user.role});
-    const refreshToken = await generateRefreshToken(user._id.toString());
     return {
         user:{
             id: user._id,
@@ -60,7 +53,29 @@ export const registerUser = async(userData:RegisterUserInput)=>{
             email: user.email,
             role: user.role,
         },
-        accessToken,
-        refreshToken,
     };
-}
+};
+
+
+export const verifyEmail = async(verificationCode:string)=>{
+    const user = await userModel.findOne({verificationCode,verificationCodeExpiresAt:{$gt:Date.now()}});
+    if(!user){
+        throw new ApiError("Invalid or expired verification code",400);
+    }
+    user.isEmailVerified = true;
+    user.verificationCode = undefined;
+    user.verificationCodeExpiresAt = undefined;
+
+    await user.save();
+
+    const subject = `Welcome to ${process.env.APP_NAME} - Email Verified Successfully`;
+    const html =  welcomeEmailTemplate(user.username);
+    await sendEmail({to:user.email,subject,html});
+
+    return {
+        user:{
+            username:user.username,
+            email : user.email,
+            isEmailVerified: user.isEmailVerified
+    }}
+};

@@ -108,9 +108,11 @@ const userSchema: Schema<IUser> = new Schema({
     }],
     verificationCode :{
         type:String,
+        trim: true,
+        unique:true
     },
     verificationCodeExpiresAt:{
-        type: Date
+        type: Date,
     },
     isActive: { type: Boolean, default: true },
     lastLogin: { type: Date }

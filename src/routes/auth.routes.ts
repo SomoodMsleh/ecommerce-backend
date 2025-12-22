@@ -4,5 +4,7 @@ import asyncHandler from "../middlewares/asyncHandler.middleware.js";
 const router = Router();
 
 router.post('/',asyncHandler(authController.register));
+router.post('/verifyEmail',asyncHandler(authController.isEmailVerified));
+
 
 export default router;

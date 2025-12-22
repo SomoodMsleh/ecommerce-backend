@@ -1,10 +1,32 @@
-import {Request,Response,NextFunction} from "express";
-import {successResponse} from "../utils/response.util.js";
+import { Request, Response, NextFunction } from "express";
+import { successResponse } from "../utils/response.util.js";
 import * as authServices from '../services/auth.service.js';
+import ApiError from "../utils/error.util.js";
 
 
 
-export const register = async (req:Request,res:Response,next:NextFunction)=>{
-    const result = await authServices.registerUser(req.body);
-    successResponse(res,201,'Registration successful', result)
-} 
+export const register = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!req.body.username || !req.body.firstName || !req.body.lastName || !req.body.password || !req.body.email) {
+            throw new ApiError("Missing required fields", 400)
+        }
+        const result = await authServices.registerUser(req.body);
+        successResponse(res, 201, 'Registration successful', result);
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const isEmailVerified = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const verificationCode = req.body.verificationCode; 
+        if (!verificationCode) {
+            throw new ApiError("Verification code is required", 400);
+        }
+        const result = await authServices.verifyEmail(verificationCode);
+        successResponse(res, 200, "Email verified successfully. You can now login.", result);
+    } catch (error) {
+        next(error);
+    }
+};
+

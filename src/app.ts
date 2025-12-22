@@ -1,7 +1,7 @@
 import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import router from './routes/index.routes.js';
+import router from './routes/index.js';
 import errorHandler from './middlewares/error.middleware.js';
 import { Request,Response } from 'express';
 const app:Application = express(); 
