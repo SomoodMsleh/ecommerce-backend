@@ -4,7 +4,7 @@ export const successResponse = <T>(res:Response, statusCode:number, message:stri
     if(data !== undefined){
         response.data = data;
     }
-    res.status(statusCode).json();
+    res.status(statusCode).json(response);
 };
 
 export const paginatedResponse = ()=>{

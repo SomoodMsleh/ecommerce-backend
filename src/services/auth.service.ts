@@ -21,6 +21,7 @@ interface RegisterUserInput {
     password :string,
     firstName :string,
     lastName :string,
+    phoneNumber ?: string,
 }
 
 
@@ -40,8 +41,12 @@ export const registerUser = async(userData:RegisterUserInput)=>{
     const verificationCode = generateVerificationCode();
     const verificationCodeExpiresAt = Date.now() + VERIFICATION_CODE_EXPIRY;
     userData.password = hashedPassword;
-    const user = await userModel.create({...userData,verificationCode,verificationCodeExpiresAt,});
+    const user = await userModel.create({...userData,verificationCode,verificationCodeExpiresAt});
     const html = verificationEmailTemplate.replace("{verificationCode}",verificationCode );
+    console.log("EMAIL_HOST =", process.env.EMAIL_HOST);
+    console.log("EMAIL_PORT =", process.env.EMAIL_PORT);
+    console.log("EMAIL_USER =", process.env.EMAIL_USER);
+    console.log("EMAIL_PASSWORD =", process.env.EMAIL_PASSWORD ? "OK" : "MISSING");
     await sendEmail({to:user.email,subject:'Verify your email',html});
 
     const accessToken = generateToken({userId:user._id, role:user.role});

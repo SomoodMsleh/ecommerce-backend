@@ -1,9 +1,7 @@
-import {Router, Request, Response} from 'express';
-
+import {Router} from 'express';
+import authRoutes from "./auth.routes.js";
 const router = Router();
 
-router.get('/', (req:Request, res:Response) =>{
-    res.status(200).json({message:"hello world"});
-});
+router.use('/auth',authRoutes);
 
 export default router;

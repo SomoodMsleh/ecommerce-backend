@@ -22,6 +22,8 @@ export interface IUser extends Document {
         country: string;
         isDefault: boolean;
     }>;
+    verificationCode?: string,
+    verificationCodeExpiresAt?:Date,
     isActive : boolean;
     lastLogin ?: Date;
     createdAt: Date;
@@ -104,6 +106,12 @@ const userSchema: Schema<IUser> = new Schema({
         country: {type: String},
         isDefault: { type: Boolean, default: false },
     }],
+    verificationCode :{
+        type:String,
+    },
+    verificationCodeExpiresAt:{
+        type: Date
+    },
     isActive: { type: Boolean, default: true },
     lastLogin: { type: Date }
 },{
