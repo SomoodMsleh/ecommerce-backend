@@ -6,6 +6,7 @@ interface payloadJWt extends JwtPayload {
     userId: string,
     role: "customer" | "admin" | "vendor",
 };
+
 export const generateToken  = (res: Response, payload: payloadJWt): string => {
     const jwtSecret: string = process.env.JWT_SECRET || '';
     if (!jwtSecret) {
