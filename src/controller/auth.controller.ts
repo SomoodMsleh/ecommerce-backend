@@ -81,3 +81,17 @@ export const logout = async(req:Request,res:Response,next:NextFunction)=>{
         next(error)
     }
 };
+
+export const refreshToken = async(req:Request,res:Response,next:NextFunction)=>{
+    try{
+        const refreshToken1 = req.cookies?.refreshToken || req.body.refreshToken;
+        if (!refreshToken1){
+            throw new ApiError("Refresh token is required",400)
+        }
+        const result = await authServices.refreshAccessToken(res,refreshToken1);
+        successResponse(res, 200, 'Token refreshed',result);
+    }catch(error){
+        next(error)
+    }
+};
+
