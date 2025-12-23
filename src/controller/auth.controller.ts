@@ -69,3 +69,15 @@ export const resetPassword = async (req:Request,res:Response,next:NextFunction)=
         next(error);
     }
 }
+
+export const logout = async(req:Request,res:Response,next:NextFunction)=>{
+    try{
+        const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
+        if (refreshToken){
+            await authServices.logoutUser(res, refreshToken);
+        }
+        successResponse(res, 200, 'Logout successful');
+    }catch(error){
+        next(error)
+    }
+};

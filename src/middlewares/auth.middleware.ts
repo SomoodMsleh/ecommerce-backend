@@ -9,7 +9,10 @@ export interface AuthRequest extends Request {
 
 const authenticate = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> =>{
     try{
-        const token = req.headers.authorization?.split(" ")[1]; // (?.) if authorization is exists, split it and get the token
+        let token = req.headers.authorization?.split(" ")[1]; // (?.) if authorization is exists, split it and get the token
+        if (!token) {
+            token = req.cookies?.token;
+        }
         if(!token){
             throw new ApiError('Access token is required', 401);
         }

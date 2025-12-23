@@ -1,7 +1,7 @@
 import userModel from "../models/User.model.js";
 import { sendEmail } from "./email.service.js";
 import {hashPassword ,comparePassword} from "../utils/bcrypt.util.js";
-import { generateToken, generateRefreshToken } from "../utils/jwt.util.js";
+import { generateToken, generateRefreshToken, clearAuthCookies } from "../utils/jwt.util.js";
 import ApiError from "../utils/error.util.js";
 import {customAlphabet} from 'nanoid';
 import { verificationEmailTemplate , welcomeEmailTemplate} from "../emailTemplates/verificationEmailTemplate.js";
@@ -159,4 +159,9 @@ export const userResetPassword = async(token:string,password:string)=>{
     await user.save();
     await RefreshTokenModel.deleteMany({user:user._id});
     return;
+};
+
+export const logoutUser = async(res:Response, refreshToken:string)=>{
+    await RefreshTokenModel.deleteOne({token:refreshToken});
+    clearAuthCookies(res);
 };

@@ -9,4 +9,5 @@ router.post('/login',asyncHandler(authController.login));
 
 router.post('/forgetPassword',asyncHandler(authController.forgetPassword));
 router.post('/resetPassword/:token',asyncHandler(authController.resetPassword));
+router.post('/logout',asyncHandler(authController.logout));
 export default router;
