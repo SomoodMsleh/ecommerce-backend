@@ -42,3 +42,16 @@ export const login = async (req:Request,res:Response,next:NextFunction) =>{
         next(error);
     }
 };
+
+export const forgetPassword = async (req:Request,res:Response,next:NextFunction) =>{
+    try{
+        const email = req.body.email;
+        if (!email){
+            throw new ApiError("Email is required",400);
+        }
+        const result = await authServices.userForgetPassword(email);
+        successResponse(res, 200, "If this email exists in our system, a password reset link has been sent", result);
+    }catch(error){
+        next(error)
+    }
+}

@@ -26,6 +26,8 @@ export interface IUser extends Document {
     verificationCodeExpiresAt?:Date,
     isActive : boolean;
     lastLogin ?: Date;
+    resetPasswordToken ?: string,
+    resetPasswordExpiresAt ?: Date,
     createdAt: Date;
     updatedAt : Date;
 }; 
@@ -115,7 +117,15 @@ const userSchema: Schema<IUser> = new Schema({
         type: Date,
     },
     isActive: { type: Boolean, default: true },
-    lastLogin: { type: Date }
+    lastLogin: { type: Date },
+    resetPasswordToken:{
+        type:String,
+        trim: true,
+        unique:true
+    },
+    resetPasswordExpiresAt:{
+        type: Date,
+    }
 },{
     timestamps: true,
 });

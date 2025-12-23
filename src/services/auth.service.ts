@@ -6,9 +6,13 @@ import ApiError from "../utils/error.util.js";
 import {customAlphabet} from 'nanoid';
 import { verificationEmailTemplate , welcomeEmailTemplate} from "../emailTemplates/verificationEmailTemplate.js";
 import { Response } from "express";
-
+import crypto from "node:crypto";
+import {passwordResetRequestTemplate} from "../emailTemplates/passwordResetRequestTemplate.js";
 const VERIFICATION_CODE_LENGTH = 8;
 const VERIFICATION_CODE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
+const PASSWORD_RESET_EXPIRY = 1 * 60 * 60 * 1000; // 1 hour
+const PASSWORD_RESET_TOKEN_SIZE = 20;
+
 
 const generateVerificationCode = customAlphabet(
     '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ',
@@ -114,3 +118,23 @@ export const loginUser = async(res:Response ,email:string,password:string)=>{
         refreshToken
     }
 };
+
+export const userForgetPassword = async (email:string) =>{
+    const user = await userModel.findOne({email});
+    if (!user){
+        return {email};
+    }
+    const resetToken = crypto.randomBytes(PASSWORD_RESET_TOKEN_SIZE).toString('hex');
+    const resetTokenExpiresAt = Date.now() + PASSWORD_RESET_EXPIRY;
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    user.resetPasswordToken  = hashedToken;
+    user.resetPasswordExpiresAt = resetTokenExpiresAt;
+
+    await user.save();
+    const resetURL = `${process.env.CLIENT_URL}/auth/resetPassword/${resetToken}`;
+    const subject = "Reset your password";
+    const html = passwordResetRequestTemplate.replace("{resetURL}", resetURL);
+    await sendEmail({to:email,subject,html});
+    return {email}
+}
+
