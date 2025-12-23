@@ -8,6 +8,7 @@ import { verificationEmailTemplate , welcomeEmailTemplate} from "../emailTemplat
 import { Response } from "express";
 import crypto from "node:crypto";
 import {passwordResetRequestTemplate} from "../emailTemplates/passwordResetRequestTemplate.js";
+import RefreshTokenModel from "../models/RefreshToken.model.js";
 const VERIFICATION_CODE_LENGTH = 8;
 const VERIFICATION_CODE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
 const PASSWORD_RESET_EXPIRY = 1 * 60 * 60 * 1000; // 1 hour
@@ -138,3 +139,24 @@ export const userForgetPassword = async (email:string) =>{
     return {email}
 }
 
+export const userResetPassword = async(token:string,password:string)=>{
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const user = await userModel.findOne({resetPasswordToken:hashedToken,resetPasswordExpiresAt:{$gt:Date.now()}}).select("+password");
+    if(!user){
+        throw new ApiError("Invalid or expired reset token",400)
+    }
+    if (password.length < 6) {
+        throw new ApiError("Password must be at least 6 characters",400);
+	}
+    const isSame = await comparePassword(password, user.password);
+    if (isSame) {
+        throw new ApiError("New password must be different from old password",400);
+    }
+    const hashedPassword = await hashPassword(password);
+    user.password = hashedPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpiresAt = undefined;
+    await user.save();
+    await RefreshTokenModel.deleteMany({user:user._id});
+    return;
+};

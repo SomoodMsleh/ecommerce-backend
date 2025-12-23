@@ -54,4 +54,18 @@ export const forgetPassword = async (req:Request,res:Response,next:NextFunction)
     }catch(error){
         next(error)
     }
+};
+
+export const resetPassword = async (req:Request,res:Response,next:NextFunction)=>{
+    try{
+        const token = req.params.token;
+        const password = req.body.password;
+        if (!token || !password) {
+            throw new ApiError("Token and password are required", 400);
+        }
+        const result = await authServices.userResetPassword(token,password);
+        successResponse(res, 200, "Password reset successfully", result);
+    } catch(error){
+        next(error);
+    }
 }

@@ -8,4 +8,5 @@ router.post('/verifyEmail',asyncHandler(authController.isEmailVerified));
 router.post('/login',asyncHandler(authController.login));
 
 router.post('/forgetPassword',asyncHandler(authController.forgetPassword));
+router.post('/resetPassword/:token',asyncHandler(authController.resetPassword));
 export default router;
