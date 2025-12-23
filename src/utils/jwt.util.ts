@@ -6,7 +6,6 @@ interface payloadJWt extends JwtPayload {
     userId: string,
     role: "customer" | "admin" | "vendor",
 };
-
 export const generateToken  = (res: Response, payload: payloadJWt): string => {
     const jwtSecret: string = process.env.JWT_SECRET || '';
     if (!jwtSecret) {
@@ -19,6 +18,7 @@ export const generateToken  = (res: Response, payload: payloadJWt): string => {
         secure: false,
         sameSite: 'lax' as const,
         path:'/',
+        maxAge: 15 * 60 * 60 * 1000,
     });
     return token;
 }; // generate access token
@@ -50,6 +50,7 @@ export const generateRefreshToken = async (res:Response, userId: string): Promis
         secure: false,
         sameSite: 'lax' as const,
         path:'/',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
     return RefreshToken;
 };
@@ -96,10 +97,15 @@ export const verifyRefreshToken = (token: string): { userId: string } => {
 export const clearAuthCookies = (res:Response):void=>{
     const options = {
         httpOnly: true,
-        secure: false,
-        sameSite: 'lax' as const,
-        path: '/',
+        secure: false,           
+        sameSite: 'lax' as const, 
+        path: '/',   
+        expires: new Date(0),
     };
     res.clearCookie('token', options);
     res.clearCookie('refreshToken', options);
 };
+
+
+
+
