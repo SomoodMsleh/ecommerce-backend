@@ -9,7 +9,11 @@ import { Response } from "express";
 import crypto from "node:crypto";
 import { passwordResetRequestTemplate } from "../emailTemplates/passwordResetRequestTemplate.js";
 import RefreshTokenModel from "../models/RefreshToken.model.js";
-import { resetPassword } from "../controller/auth.controller.js";
+import speakeasy from "speakeasy";
+import QRCode from "qrcode";
+
+
+
 const VERIFICATION_CODE_LENGTH = 8;
 const VERIFICATION_CODE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
 const PASSWORD_RESET_EXPIRY = 1 * 60 * 60 * 1000; // 1 hour
@@ -185,3 +189,28 @@ export const refreshAccessToken = async (res: Response, refreshToken: string) =>
     await generateRefreshToken(res, user._id.toString());
     return;
 };
+
+export const enable2FA = async (userId:string)=>{
+    const user = await userModel.findById(userId);
+    if(!user){
+        throw new ApiError("User not found",404);
+    }
+    if(user.isTwoFactorEnabled){
+        throw new ApiError("2FA is already enabled",400);
+    }
+    const secret = speakeasy.generateSecret({
+        name:`${process.env.APP_NAME} (${user.email})`,
+        issuer:`EcommerceApp`
+    });
+    user.isTwoFactorEnabled = true;
+    user.twoFactorSecret  = secret.base32;
+    await user.save();
+
+    const qrImage = await QRCode.toDataURL(secret.otpauth_url!);
+    return {
+        qrImage,
+        message:"Scan this QR code with your authenticator app and verify with a code"
+    };
+};
+
+

@@ -6,7 +6,7 @@ import connectDB from './config/database.config.js';
 const PORT = process.env.PORT || 5000;
 const startServer  = async():Promise<void> => {
     try{
-        await connectDB();
+        await connectDB(); 
         app.listen(PORT,()=>{
             logger.info(`🚀 server is running on http://localhost:${PORT} ....`);
             logger.info(`📍 Environment: ${process.env.NODE_ENV}`);

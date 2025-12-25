@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { successResponse } from "../utils/response.util.js";
 import * as authServices from '../services/auth.service.js';
+import {AuthRequest} from "../middlewares/auth.middleware.js"
 import ApiError from "../utils/error.util.js";
 
 
@@ -94,4 +95,15 @@ export const refreshToken = async(req:Request,res:Response,next:NextFunction)=>{
         next(error)
     }
 };
+
+export const enable2FA = async(req:AuthRequest,res:Response,next:NextFunction)=>{
+    try{
+        const userId = req.user._id.toString();
+        const result = await authServices.enable2FA(userId);
+        successResponse(res, 200, '2FA setup initiated',result);
+    }catch(error){
+        next(error)
+    }
+};
+
 
