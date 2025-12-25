@@ -212,6 +212,30 @@ export const enable2FA = async (userId:string)=>{
     };
 };
 
-export const verify2FA = async()=>{
+export const verify2FA = async(userId:string,token:string)=>{
+    const user = await userModel.findById(userId);
+    if(!user){
+        throw new ApiError("User not found",404);
+    }
+    if (user.isTwoFactorEnabled) {
+        throw new ApiError("2FA is already enabled", 400);
+    }
+    if (!user.twoFactorTempSecret) {
+        throw new ApiError("2FA setup not initiated", 400);
+    }
+    const verified = speakeasy.totp.verify({
+        secret : user.twoFactorTempSecret,
+        encoding:'base32',
+        token:token,
+        window:2 //  Allow a ±60s time drift to handle small clock differences between server and authenticator
+    });
+    if(!verified){
+        throw new ApiError("Invalid 2FA token",400);
+    }
+    user.isTwoFactorEnabled = true;
+    user.twoFactorSecret = user.twoFactorTempSecret;
+    user.twoFactorTempSecret = undefined;
+    await user.save()
+    return { message: "2FA enabled successfully" };
+};
 
-}

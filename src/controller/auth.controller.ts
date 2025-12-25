@@ -3,6 +3,7 @@ import { successResponse } from "../utils/response.util.js";
 import * as authServices from '../services/auth.service.js';
 import {AuthRequest} from "../middlewares/auth.middleware.js"
 import ApiError from "../utils/error.util.js";
+import { userInfo } from "node:os";
 
 
 
@@ -109,7 +110,13 @@ export const enable2FA = async(req:AuthRequest,res:Response,next:NextFunction)=>
 
 export const verify2FA =  async(req:AuthRequest,res:Response,next:NextFunction)=>{
     try{
-        
+        const token = req.body.token;
+        if(!token){
+            throw new ApiError("2FA token is required",400);
+        }
+        const userId = req.user._id.toString();
+        const result = await authServices.verify2FA(userId,token);
+        successResponse(res, 200, '2FA verified successfully',result);
     }catch(error){
         next(error)
     }
