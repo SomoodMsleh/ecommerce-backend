@@ -3,7 +3,6 @@ import { successResponse } from "../utils/response.util.js";
 import * as authServices from '../services/auth.service.js';
 import {AuthRequest} from "../middlewares/auth.middleware.js"
 import ApiError from "../utils/error.util.js";
-import { userInfo } from "node:os";
 
 
 
