@@ -202,8 +202,7 @@ export const enable2FA = async (userId:string)=>{
         name:`${process.env.APP_NAME} (${user.email})`,
         issuer:`EcommerceApp`
     });
-    user.isTwoFactorEnabled = true;
-    user.twoFactorSecret  = secret.base32;
+    user.twoFactorTempSecret  = secret.base32;
     await user.save();
 
     const qrImage = await QRCode.toDataURL(secret.otpauth_url!);
@@ -213,4 +212,6 @@ export const enable2FA = async (userId:string)=>{
     };
 };
 
+export const verify2FA = async()=>{
 
+}

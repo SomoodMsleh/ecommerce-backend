@@ -107,3 +107,10 @@ export const enable2FA = async(req:AuthRequest,res:Response,next:NextFunction)=>
 };
 
 
+export const verify2FA =  async(req:AuthRequest,res:Response,next:NextFunction)=>{
+    try{
+        
+    }catch(error){
+        next(error)
+    }
+};

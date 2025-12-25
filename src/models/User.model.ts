@@ -9,6 +9,7 @@ export interface IUser extends Document {
     phoneNumber?: string; // optional property
     role: "customer" | "admin" | "vendor";
     isEmailVerified: boolean;
+    twoFactorTempSecret?: string;
     isTwoFactorEnabled : boolean;
     twoFactorSecret ?: string;
     googleId ?: string;
@@ -86,6 +87,9 @@ const userSchema: Schema<IUser> = new Schema({
     isTwoFactorEnabled: { 
         type: Boolean, 
         default: false 
+    },
+    twoFactorTempSecret:{
+        type: String
     },
     twoFactorSecret: { type: String },
     googleId: { type: String },

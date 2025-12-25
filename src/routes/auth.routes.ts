@@ -14,4 +14,5 @@ router.post('/logout',asyncHandler(authController.logout));
 
 router.post('/refresh',asyncHandler(authController.refreshToken));
 router.post('/2fa/enable',authenticate,asyncHandler(authController.enable2FA));
+router.post('/2fa/verify',authenticate,asyncHandler(authController.verify2FA));
 export default router;
