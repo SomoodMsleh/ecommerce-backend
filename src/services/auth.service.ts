@@ -108,9 +108,9 @@ export const loginUser = async (res: Response, email: string, password: string) 
     if (!isPasswordValid) {
         throw new ApiError("Invalid credentials", 401);
     }
-    if(user.isTwoFactorEnabled && user.twoFactorSecret){
-        return{
-            message:"Please provide 2FA code",
+    if (user.isTwoFactorEnabled && user.twoFactorSecret) {
+        return {
+            message: "Please provide 2FA code",
             twoFactorRequired: true,
             userId: user._id,
         }
@@ -197,32 +197,32 @@ export const refreshAccessToken = async (res: Response, refreshToken: string) =>
     return;
 };
 
-export const enable2FA = async (userId:string)=>{
+export const enable2FA = async (userId: string) => {
     const user = await userModel.findById(userId);
-    if(!user){
-        throw new ApiError("User not found",404);
+    if (!user) {
+        throw new ApiError("User not found", 404);
     }
-    if(user.isTwoFactorEnabled){
-        throw new ApiError("2FA is already enabled",400);
+    if (user.isTwoFactorEnabled) {
+        throw new ApiError("2FA is already enabled", 400);
     }
     const secret = speakeasy.generateSecret({
-        name:`${process.env.APP_NAME} (${user.email})`,
-        issuer:`EcommerceApp`
+        name: `${process.env.APP_NAME} (${user.email})`,
+        issuer: `EcommerceApp`
     });
-    user.twoFactorTempSecret  = secret.base32;
+    user.twoFactorTempSecret = secret.base32;
     await user.save();
 
     const qrImage = await QRCode.toDataURL(secret.otpauth_url!);
     return {
         qrImage,
-        message:"Scan this QR code with your authenticator app and verify with a code"
+        message: "Scan this QR code with your authenticator app and verify with a code"
     };
 };
 
-export const verify2FA = async(userId:string,token:string)=>{
+export const verify2FA = async (userId: string, token: string) => {
     const user = await userModel.findById(userId);
-    if(!user){
-        throw new ApiError("User not found",404);
+    if (!user) {
+        throw new ApiError("User not found", 404);
     }
     if (user.isTwoFactorEnabled) {
         throw new ApiError("2FA is already enabled", 400);
@@ -231,13 +231,13 @@ export const verify2FA = async(userId:string,token:string)=>{
         throw new ApiError("2FA setup not initiated", 400);
     }
     const verified = speakeasy.totp.verify({
-        secret : user.twoFactorTempSecret,
-        encoding:'base32',
-        token:token,
-        window:2 //  Allow a ±60s time drift to handle small clock differences between server and authenticator
+        secret: user.twoFactorTempSecret,
+        encoding: 'base32',
+        token: token,
+        window: 2 //  Allow a ±60s time drift to handle small clock differences between server and authenticator
     });
-    if(!verified){
-        throw new ApiError("Invalid 2FA token",400);
+    if (!verified) {
+        throw new ApiError("Invalid 2FA token", 400);
     }
     user.isTwoFactorEnabled = true;
     user.twoFactorSecret = user.twoFactorTempSecret;
@@ -246,22 +246,22 @@ export const verify2FA = async(userId:string,token:string)=>{
     return { message: "2FA enabled successfully" };
 };
 
-export const verify2FALogin = async(res:Response,userId:string,otp:string)=>{
+export const verify2FALogin = async (res: Response, userId: string, otp: string) => {
     const user = await userModel.findById(userId);
-    if(!user){
-        throw new ApiError("User not found",404);
+    if (!user) {
+        throw new ApiError("User not found", 404);
     }
     if (!user.isTwoFactorEnabled || !user.twoFactorSecret) {
         throw new ApiError("2FA is not enabled for this account", 400);
     }
     const verified = speakeasy.totp.verify({
-        secret : user.twoFactorSecret,
-        encoding:'base32',
-        token:otp,
-        window:2 //  Allow a ±60s time drift to handle small clock differences between server and authenticator
+        secret: user.twoFactorSecret,
+        encoding: 'base32',
+        token: otp,
+        window: 2 //  Allow a ±60s time drift to handle small clock differences between server and authenticator
     });
-    if(!verified){
-        throw new ApiError("Invalid 2FA token",400);
+    if (!verified) {
+        throw new ApiError("Invalid 2FA token", 400);
     }
 
     user.lastLogin = Date.now();
@@ -282,4 +282,40 @@ export const verify2FALogin = async(res:Response,userId:string,otp:string)=>{
         refreshToken
     }
 
+};
+
+// Require valid 2FA code in addition to password to disable 2FA
+export const disable2FA = async (userId: string, password: string, otp?: string) => { 
+    const user = await userModel.findById(userId).select('+password');
+    if (!user || !user.password) {
+        throw new ApiError("User not found", 404);
+    }
+
+    if (!user.isTwoFactorEnabled || !user.twoFactorSecret) {
+        throw new ApiError("2FA is not enabled", 400);
+    }
+
+    const isPasswordValid = await comparePassword(password, user.password);
+    if (!isPasswordValid) {
+        throw new ApiError("Invalid credentials", 401);
+    }
+    if (!otp) {
+        throw new ApiError("2FA code is required to disable 2FA", 400);
+    }
+    const verified = speakeasy.totp.verify({
+        secret: user.twoFactorSecret,
+        encoding: 'base32',
+        token: otp,
+        window: 2
+    });
+    if (!verified) {
+        throw new ApiError("Invalid 2FA code", 400);
+    }
+
+    user.isTwoFactorEnabled = false;
+    user.twoFactorSecret = undefined;
+    user.twoFactorTempSecret = undefined;
+    await user.save();
+
+    return;
 };

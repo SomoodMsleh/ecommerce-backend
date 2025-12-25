@@ -122,14 +122,30 @@ export const verify2FA =  async(req:AuthRequest,res:Response,next:NextFunction)=
     }
 };
 
-export const verify2FALogin = async(req:AuthRequest,res:Response,next:NextFunction)=>{
+export const verify2FALogin = async(req:Request,res:Response,next:NextFunction)=>{
     try{
         const { userId, token } = req.body;
-        if(!token){
-            throw new ApiError("2FA token is required",400);
+        if (!userId || !token) {
+            throw new ApiError("UserId and 2FA token are required", 400);
         }
-        const result = await authServices.verify2FALogin(res,userId,token);
-        successResponse(res, 200, '',result);
+
+        const result = await authServices.verify2FALogin(res, userId, token);
+        successResponse(res, 200, "Login successful", result);
+    }catch(error){
+        next(error)
+    }
+};
+
+
+export const disable2FA = async(req:AuthRequest,res:Response,next:NextFunction)=>{
+    try{
+        const {password,otp} = req.body;
+        if(!password){
+            throw new ApiError("Password is required", 400);
+        }
+        const userId = req.user._id.toString();
+        await authServices.disable2FA(userId,password,otp);
+        successResponse(res, 200, '2FA disabled successfully');
     }catch(error){
         next(error)
     }
