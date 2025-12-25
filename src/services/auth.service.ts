@@ -108,6 +108,13 @@ export const loginUser = async (res: Response, email: string, password: string) 
     if (!isPasswordValid) {
         throw new ApiError("Invalid credentials", 401);
     }
+    if(user.isTwoFactorEnabled && user.twoFactorSecret){
+        return{
+            message:"Please provide 2FA code",
+            twoFactorRequired: true,
+            userId: user._id,
+        }
+    }
 
     user.lastLogin = Date.now();
     await user.save();
@@ -239,3 +246,40 @@ export const verify2FA = async(userId:string,token:string)=>{
     return { message: "2FA enabled successfully" };
 };
 
+export const verify2FALogin = async(res:Response,userId:string,otp:string)=>{
+    const user = await userModel.findById(userId);
+    if(!user){
+        throw new ApiError("User not found",404);
+    }
+    if (!user.isTwoFactorEnabled || !user.twoFactorSecret) {
+        throw new ApiError("2FA is not enabled for this account", 400);
+    }
+    const verified = speakeasy.totp.verify({
+        secret : user.twoFactorSecret,
+        encoding:'base32',
+        token:otp,
+        window:2 //  Allow a ±60s time drift to handle small clock differences between server and authenticator
+    });
+    if(!verified){
+        throw new ApiError("Invalid 2FA token",400);
+    }
+
+    user.lastLogin = Date.now();
+    await user.save();
+
+    const token = generateToken(res, { userId: user._id, role: user.role });
+    const refreshToken = await generateRefreshToken(res, user._id.toString());
+
+    return {
+        user: {
+            username: user.username,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            role: user.role,
+        },
+        token,
+        refreshToken
+    }
+
+};

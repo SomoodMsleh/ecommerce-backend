@@ -121,3 +121,16 @@ export const verify2FA =  async(req:AuthRequest,res:Response,next:NextFunction)=
         next(error)
     }
 };
+
+export const verify2FALogin = async(req:AuthRequest,res:Response,next:NextFunction)=>{
+    try{
+        const { userId, token } = req.body;
+        if(!token){
+            throw new ApiError("2FA token is required",400);
+        }
+        const result = await authServices.verify2FALogin(res,userId,token);
+        successResponse(res, 200, '',result);
+    }catch(error){
+        next(error)
+    }
+};
