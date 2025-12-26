@@ -5,7 +5,7 @@ export interface IUser extends Document {
     firstName: string;
     lastName: string;
     email: string;
-    password : string; 
+    password ?: string; 
     phoneNumber?: string; // optional property
     role: "customer" | "admin" | "vendor";
     isEmailVerified: boolean;
@@ -14,7 +14,7 @@ export interface IUser extends Document {
     twoFactorSecret ?: string;
     googleId ?: string;
     facebookId ?: string;
-    avatar ?: { url: string, publicId?: string };
+    avatar ?: string;
     addresses ?: Array<{
         street: string;
         city: string;
@@ -40,7 +40,6 @@ const userSchema: Schema<IUser> = new Schema({
         unique: true,
         minlength: [3, "Username must be at least 3 characters"],
         maxlength: [30, "Username cannot exceed 30 characters"],
-        sparse: true,
         trim: true
     },
     firstName: {
@@ -67,7 +66,6 @@ const userSchema: Schema<IUser> = new Schema({
     password:{
         type: String,
         minlength: [6, "Password must be at least 6 characters"],
-        required: true,
         select: false // don`t return password field by default
     },
     phoneNumber: {
@@ -94,16 +92,7 @@ const userSchema: Schema<IUser> = new Schema({
     twoFactorSecret: { type: String },
     googleId: { type: String },
     facebookId: { type: String },
-    avatar:[{
-        url : {
-            type: String,
-            required: [true , "Avatar URL is required"],
-        },
-        publicId : {
-            type: String,
-            required: false,
-        }
-    }],
+    avatar:{type:String},
     addresses:[{
         street: {type: String},
         city: {type: String},
@@ -115,7 +104,8 @@ const userSchema: Schema<IUser> = new Schema({
     verificationCode :{
         type:String,
         trim: true,
-        unique:true
+        unique:true,
+        sparse: true
     },
     verificationCodeExpiresAt:{
         type: Date,
@@ -125,7 +115,8 @@ const userSchema: Schema<IUser> = new Schema({
     resetPasswordToken:{
         type:String,
         trim: true,
-        unique:true
+        unique:true,
+        sparse: true
     },
     resetPasswordExpiresAt:{
         type: Date,
@@ -133,6 +124,6 @@ const userSchema: Schema<IUser> = new Schema({
 },{
     timestamps: true,
 });
-userSchema.index({email : 1}); // create index on email field for faster search
+
 const userModel = mongoose.models.User || model<IUser>("User", userSchema); // to avoid model overwrite issue in watch mode
 export default userModel;

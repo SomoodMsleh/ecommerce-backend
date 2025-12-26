@@ -23,5 +23,9 @@ router.post('/2fa/verify',authenticate,validation(authValidation.verify2FASchema
 router.post('/2fa/verify-login',validation(authValidation.verify2FALoginSchema),asyncHandler(authController.verify2FALogin));
 router.post('/2fa/disable',authenticate,validation(authValidation.disable2FASchema),asyncHandler(authController.disable2FA));
 
+router.get('/google/',passport.authenticate('google',{scope:['profile','email'],session:false}));
+router.get('/google/callback',passport.authenticate('google',{failureMessage:true,session:false}),asyncHandler(authController.googleCallback));
+
+
 
 export default router;

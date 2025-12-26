@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { successResponse } from "../utils/response.util.js";
 import * as authServices from '../services/auth.service.js';
-import {AuthRequest} from "../middlewares/auth.middleware.js"
+import { AuthRequest } from "../middlewares/auth.middleware.js"
 import ApiError from "../utils/error.util.js";
 
 
@@ -20,7 +20,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 
 export const isEmailVerified = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const verificationCode = req.body.verificationCode; 
+        const verificationCode = req.body.verificationCode;
         if (!verificationCode) {
             throw new ApiError("Verification code is required", 400);
         }
@@ -31,98 +31,98 @@ export const isEmailVerified = async (req: Request, res: Response, next: NextFun
     }
 };
 
-export const login = async (req:Request,res:Response,next:NextFunction) =>{
-    try{
-        const {email, password} = req.body;
-        if(!email || !password){
-            throw new ApiError("Email and password are required",400);
+export const login = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+            throw new ApiError("Email and password are required", 400);
         }
-        const result = await authServices.loginUser(res,email,password);
+        const result = await authServices.loginUser(res, email, password);
         successResponse(res, 200, "Logged in successfully", result);
-    }catch(error){
+    } catch (error) {
         next(error);
     }
 };
 
-export const forgetPassword = async (req:Request,res:Response,next:NextFunction) =>{
-    try{
+export const forgetPassword = async (req: Request, res: Response, next: NextFunction) => {
+    try {
         const email = req.body.email;
-        if (!email){
-            throw new ApiError("Email is required",400);
+        if (!email) {
+            throw new ApiError("Email is required", 400);
         }
         const result = await authServices.userForgetPassword(email);
         successResponse(res, 200, "If this email exists in our system, a password reset link has been sent", result);
-    }catch(error){
+    } catch (error) {
         next(error)
     }
 };
 
-export const resetPassword = async (req:Request,res:Response,next:NextFunction)=>{
-    try{
+export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
+    try {
         const token = req.params.token;
         const password = req.body.password;
         if (!token || !password) {
             throw new ApiError("Token and password are required", 400);
         }
-        const result = await authServices.userResetPassword(token,password);
+        const result = await authServices.userResetPassword(token, password);
         successResponse(res, 200, "Password reset successfully", result);
-    } catch(error){
+    } catch (error) {
         next(error);
     }
 }
 
-export const logout = async(req:Request,res:Response,next:NextFunction)=>{
-    try{
+export const logout = async (req: Request, res: Response, next: NextFunction) => {
+    try {
         const refreshToken = req.cookies?.refreshToken || req.body.refreshToken;
-        if (refreshToken){
+        if (refreshToken) {
             await authServices.logoutUser(res, refreshToken);
         }
         successResponse(res, 200, 'Logout successful');
-    }catch(error){
+    } catch (error) {
         next(error)
     }
 };
 
-export const refreshToken = async(req:Request,res:Response,next:NextFunction)=>{
-    try{
+export const refreshToken = async (req: Request, res: Response, next: NextFunction) => {
+    try {
         const refreshToken1 = req.cookies?.refreshToken || req.body.refreshToken;
-        if (!refreshToken1){
-            throw new ApiError("Refresh token is required",400)
+        if (!refreshToken1) {
+            throw new ApiError("Refresh token is required", 400)
         }
-        const result = await authServices.refreshAccessToken(res,refreshToken1);
-        successResponse(res, 200, 'Token refreshed',result);
-    }catch(error){
+        const result = await authServices.refreshAccessToken(res, refreshToken1);
+        successResponse(res, 200, 'Token refreshed', result);
+    } catch (error) {
         next(error)
     }
 };
 
-export const enable2FA = async(req:AuthRequest,res:Response,next:NextFunction)=>{
-    try{
+export const enable2FA = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
         const userId = req.user._id.toString();
         const result = await authServices.enable2FA(userId);
-        successResponse(res, 200, '2FA setup initiated',result);
-    }catch(error){
+        successResponse(res, 200, '2FA setup initiated', result);
+    } catch (error) {
         next(error)
     }
 };
 
 
-export const verify2FA =  async(req:AuthRequest,res:Response,next:NextFunction)=>{
-    try{
+export const verify2FA = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
         const token = req.body.token;
-        if(!token){
-            throw new ApiError("2FA token is required",400);
+        if (!token) {
+            throw new ApiError("2FA token is required", 400);
         }
         const userId = req.user._id.toString();
-        const result = await authServices.verify2FA(userId,token);
-        successResponse(res, 200, '2FA verified successfully',result);
-    }catch(error){
+        const result = await authServices.verify2FA(userId, token);
+        successResponse(res, 200, '2FA verified successfully', result);
+    } catch (error) {
         next(error)
     }
 };
 
-export const verify2FALogin = async(req:Request,res:Response,next:NextFunction)=>{
-    try{
+export const verify2FALogin = async (req: Request, res: Response, next: NextFunction) => {
+    try {
         const { userId, token } = req.body;
         if (!userId || !token) {
             throw new ApiError("UserId and 2FA token are required", 400);
@@ -130,22 +130,43 @@ export const verify2FALogin = async(req:Request,res:Response,next:NextFunction)=
 
         const result = await authServices.verify2FALogin(res, userId, token);
         successResponse(res, 200, "Login successful", result);
-    }catch(error){
+    } catch (error) {
         next(error)
     }
 };
 
 
-export const disable2FA = async(req:AuthRequest,res:Response,next:NextFunction)=>{
-    try{
-        const {password,otp} = req.body;
-        if(!password){
+export const disable2FA = async (req: AuthRequest, res: Response, next: NextFunction) => {
+    try {
+        const { password, otp } = req.body;
+        if (!password) {
             throw new ApiError("Password is required", 400);
         }
         const userId = req.user._id.toString();
-        await authServices.disable2FA(userId,password,otp);
+        await authServices.disable2FA(userId, password, otp);
         successResponse(res, 200, '2FA disabled successfully');
-    }catch(error){
+    } catch (error) {
         next(error)
     }
 };
+
+
+
+
+export const googleCallback = async (req: AuthRequest, res: Response, next: NextFunction) => {
+
+    const user = req.user as any;
+    if (!user) {
+        throw new ApiError("xxxx",400)
+    }
+
+    try {
+        const result = await authServices.handleOAuthSuccess(req,res,user);
+
+        successResponse(res, 200, 'Google OAuth successful',result);
+    }catch (error) {
+        next(error)
+    }
+};
+
+

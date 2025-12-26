@@ -5,12 +5,13 @@ import { generateToken, generateRefreshToken, clearAuthCookies, verifyRefreshTok
 import ApiError from "../utils/error.util.js";
 import { customAlphabet } from 'nanoid';
 import { verificationEmailTemplate, welcomeEmailTemplate } from "../emailTemplates/verificationEmailTemplate.js";
-import { Response } from "express";
+import { Response, Request } from "express";
 import crypto from "node:crypto";
 import { passwordResetRequestTemplate } from "../emailTemplates/passwordResetRequestTemplate.js";
 import RefreshTokenModel from "../models/RefreshToken.model.js";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
+import logger from "../utils/logger.util.js";
 
 
 
@@ -285,7 +286,7 @@ export const verify2FALogin = async (res: Response, userId: string, otp: string)
 };
 
 // Require valid 2FA code in addition to password to disable 2FA
-export const disable2FA = async (userId: string, password: string, otp?: string) => { 
+export const disable2FA = async (userId: string, password: string, otp?: string) => {
     const user = await userModel.findById(userId).select('+password');
     if (!user || !user.password) {
         throw new ApiError("User not found", 404);
@@ -319,4 +320,30 @@ export const disable2FA = async (userId: string, password: string, otp?: string)
 
     return;
 };
+
+
+export const handleOAuthSuccess = async (req: Request,res:Response, user: any) => {
+    logger.info(`OAuth success for user: ${user.email}`);
+    const accessToken = generateToken(res, {
+        userId: user._id.toString(),
+        role: user.role,
+        email: user.email
+    });
+
+    const refreshToken = await generateRefreshToken(res, user._id.toString());
+
+    return {
+        user: {
+            id: user._id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email,
+            role: user.role,
+            avatar: user.avatar,
+        },
+        accessToken,
+        refreshToken,
+    };
+};
+
 
