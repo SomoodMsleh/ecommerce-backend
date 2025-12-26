@@ -319,3 +319,4 @@ export const disable2FA = async (userId: string, password: string, otp?: string)
 
     return;
 };
+

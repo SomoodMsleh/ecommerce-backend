@@ -3,7 +3,7 @@ dotenv.config();
 import app from './app.js';
 import logger from './utils/logger.util.js';
 import connectDB from './config/database.config.js';
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 const startServer  = async():Promise<void> => {
     try{
         await connectDB(); 

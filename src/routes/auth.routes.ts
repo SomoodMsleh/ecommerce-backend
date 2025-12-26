@@ -4,6 +4,7 @@ import asyncHandler from "../middlewares/asyncHandler.middleware.js";
 import authenticate from "../middlewares/auth.middleware.js";
 import * as authValidation from "../validators/auth.validator.js";
 import validation from '../middlewares/validate.middleware.js';
+import passport from "passport";
 const router = Router();
 
 router.post('/',validation(authValidation.registerSchema),asyncHandler(authController.register));

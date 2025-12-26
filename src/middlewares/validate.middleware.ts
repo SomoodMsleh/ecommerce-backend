@@ -4,7 +4,7 @@ import { Request,Response,NextFunction } from "express";
 
 const validation = (schema:Joi.ObjectSchema)=>{
     return (req:Request,res:Response,next:NextFunction)=>{
-        const inputData = {...req.body,...req.params,...req.query}
+        const inputData = {...req.params,...req.query,...req.body}
         const validationResult = schema.validate(inputData,{abortEarly:false});
         if(validationResult?.error){
             const errors = validationResult.error.details.map(e => e.message);

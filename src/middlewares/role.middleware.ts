@@ -2,10 +2,16 @@ import { AuthRequest } from "./auth.middleware.js";
 import { Response,NextFunction } from "express";
 import ApiError from "../utils/error.util.js";
 
-const authorize = (...roles: string[])=>{
+export enum UserRole {
+    ADMIN = 'admin',
+    CUSTOMER = 'customer',
+    VENDOR = 'vendor'
+}
+
+const authorize = (...roles: UserRole[])=>{
     return (req:AuthRequest,res:Response,next:NextFunction):void=>{
         if (!req.user) {
-            throw new ApiError('Unauthorized',401);
+            return next(new ApiError('Unauthorized', 401));
         }
         if(!roles.includes(req.user.role)){
             throw new ApiError('Access denied. Insufficient permissions',403);
