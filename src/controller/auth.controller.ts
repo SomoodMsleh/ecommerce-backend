@@ -157,7 +157,7 @@ export const googleCallback = async (req: AuthRequest, res: Response, next: Next
 
     const user = req.user as any;
     if (!user) {
-        throw new ApiError("xxxx",400)
+        throw new ApiError("OAuth authentication failed",401)
     }
 
     try {
@@ -174,13 +174,13 @@ export const facebookCallback = async (req: AuthRequest, res: Response, next: Ne
 
     const user = req.user as any;
     if (!user) {
-        throw new ApiError("xxxx",400)
+        throw new ApiError("OAuth authentication failed",401)
     }
 
     try {
         const result = await authServices.handleOAuthSuccess(req,res,user);
 
-        successResponse(res, 200, 'Google OAuth successful',result);
+        successResponse(res, 200, 'Facebook OAuth successful',result);
     }catch (error) {
         next(error)
     }

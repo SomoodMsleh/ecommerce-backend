@@ -5,6 +5,7 @@ import authenticate from "../middlewares/auth.middleware.js";
 import * as authValidation from "../validators/auth.validator.js";
 import validation from '../middlewares/validate.middleware.js';
 import passport from "passport";
+import ratelimiter from '../middlewares/rateLimiter.middleware.js';
 const router = Router();
 
 router.post('/',validation(authValidation.registerSchema),asyncHandler(authController.register));
@@ -25,6 +26,9 @@ router.post('/2fa/disable',authenticate,validation(authValidation.disable2FASche
 
 router.get('/google/',passport.authenticate('google',{scope:['profile','email'],session:false}));
 router.get('/google/callback',passport.authenticate('google',{failureMessage:true,session:false}),asyncHandler(authController.googleCallback));
+
+router.get('/facebook/',passport.authenticate('facebook',{scope:['profile','email'],session:false}));
+router.get('/facebook/callback',passport.authenticate('facebook',{failureMessage:true,session:false}),asyncHandler(authController.facebookCallback));
 
 
 
