@@ -327,7 +327,6 @@ export const handleOAuthSuccess = async (req: Request,res:Response, user: any) =
     const accessToken = generateToken(res, {
         userId: user._id.toString(),
         role: user.role,
-        email: user.email
     });
 
     const refreshToken = await generateRefreshToken(res, user._id.toString());
@@ -335,6 +334,7 @@ export const handleOAuthSuccess = async (req: Request,res:Response, user: any) =
     return {
         user: {
             id: user._id,
+            username:user.username,
             firstName: user.firstName,
             lastName: user.lastName,
             email: user.email,

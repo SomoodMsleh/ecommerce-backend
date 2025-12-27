@@ -170,3 +170,20 @@ export const googleCallback = async (req: AuthRequest, res: Response, next: Next
 };
 
 
+export const facebookCallback = async (req: AuthRequest, res: Response, next: NextFunction) => {
+
+    const user = req.user as any;
+    if (!user) {
+        throw new ApiError("xxxx",400)
+    }
+
+    try {
+        const result = await authServices.handleOAuthSuccess(req,res,user);
+
+        successResponse(res, 200, 'Google OAuth successful',result);
+    }catch (error) {
+        next(error)
+    }
+};
+
+
