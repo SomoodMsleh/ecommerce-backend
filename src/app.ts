@@ -1,4 +1,4 @@
-import express, { Application } from 'express';
+import express, { Application, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import router from './routes/index.js';
@@ -6,6 +6,7 @@ import errorHandler from './middlewares/error.middleware.js';
 import { Request,Response } from 'express';
 import cookieParser from 'cookie-parser';
 import passport from './config/passport.config.js';
+import ApiError from './utils/error.util.js';
 const app:Application = express(); 
 app.use(helmet());
 app.use(cors({origin: process.env.CLIENT_URL , credentials: true })); // enable CORS for all origins 
@@ -17,5 +18,8 @@ app.use('/api/v1',router);
 app.get('/health', (req:Request,res:Response)=>{
     res.status(200).json({status:'OK', timeStamp: new Date().toISOString()}); // Health check endpoint 
 }) 
+app.use((req:Request,res:Response,next:NextFunction)=>{
+    next(new ApiError("page not found",400));
+});
 app.use(errorHandler); // Global Error Handling Middleware
 export default app;
