@@ -14,7 +14,7 @@ export interface IUser extends Document {
     twoFactorSecret ?: string;
     googleId ?: string;
     facebookId ?: string;
-    avatar ?:  { url: string , publicId?: string;};
+    avatar ?:  {  secure_url: string , public_id?: string;};
     addresses ?: Array<{
         street: string;
         city: string;
@@ -93,8 +93,8 @@ const userSchema: Schema<IUser> = new Schema({
     googleId: { type: String },
     facebookId: { type: String },
     avatar:{
-        url: { type: String },
-        publicId: { type: String }
+        secure_url: { type: String },
+        public_id: { type: String }
     },
     addresses:[{
         street: {type: String},

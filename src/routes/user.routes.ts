@@ -3,7 +3,7 @@ import asyncHandler from "../middlewares/asyncHandler.middleware.js";
 import authenticate from "../middlewares/auth.middleware.js";
 import validation from '../middlewares/validate.middleware.js';
 import * as userController from "../controller/user.controller.js";
-import fileUpload from "../middlewares/upload.middleware.js";
+import fileUpload ,{fileValidation} from "../middlewares/upload.middleware.js";
 
 const router = Router();
 
@@ -11,6 +11,7 @@ router.get('/profile',authenticate,asyncHandler(userController.getProfile));
 router.put('/profile',authenticate,asyncHandler(userController.updateProfile));
 
 
-
+router.post('/avatar',authenticate,fileUpload(fileValidation.image).single('avatar'),asyncHandler(userController.uploadAvatar));
+router.delete('/avatar',authenticate,asyncHandler(userController.deleteAvatar));
 
 export default router;

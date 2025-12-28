@@ -31,8 +31,8 @@ passport.use(new GoogleStrategy({
                     user.googleId = profile.id;
                 }
                 user.isEmailVerified = true;
-                if (!user.avatar?.url && profile.photos?.[0]?.value) {
-                    user.avatar = { url: profile.photos?.[0]?.value };
+                if (!user.avatar?.secure_url && profile.photos?.[0]?.value) {
+                    user.avatar = {  secure_url: profile.photos?.[0]?.value };
                 }
                 user.lastLogin = new Date();
                 await user.save();
@@ -45,7 +45,7 @@ passport.use(new GoogleStrategy({
                 firstName: profile.name?.givenName || "user",
                 lastName: profile.name?.familyName || "",
                 username: generateUsername(email),
-                avatar: { url: profile.photos?.[0]?.value },
+                avatar: {  secure_url: profile.photos?.[0]?.value },
                 isEmailVerified: true,
                 isActive: true,
                 lastLogin: new Date()
@@ -85,8 +85,8 @@ passport.use(new FacebookStrategy({
                     user.facebookId = profile.id;
                 }
                 user.isEmailVerified = true;
-                if (!user.avatar?.url && profile.photos?.[0]?.value) {
-                    user.avatar = { url: profile.photos?.[0]?.value };
+                if (!user.avatar?.secure_url && profile.photos?.[0]?.value) {
+                    user.avatar = { secure_url: profile.photos?.[0]?.value };
                 }
                 user.lastLogin = new Date();
                 await user.save();
@@ -100,7 +100,7 @@ passport.use(new FacebookStrategy({
                 firstName: profile.name?.givenName || "user",
                 lastName: profile.name?.familyName || "",
                 username: generateUsername(email),
-                avatar: { url: profile.photos?.[0]?.value },
+                avatar: {  secure_url: profile.photos?.[0]?.value },
                 isEmailVerified: true,
                 isActive: true,
                 lastLogin: new Date()

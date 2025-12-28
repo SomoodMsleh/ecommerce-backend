@@ -28,5 +28,5 @@ export const uploadToCloudinary = async (buffer: Buffer, folder: string): Promis
 
 
 export const deleteFromCloudinary = async (public_id: string) => {
-    return await cloudinary.uploader.destroy(public_id);
+    await cloudinary.uploader.destroy(public_id);
 }

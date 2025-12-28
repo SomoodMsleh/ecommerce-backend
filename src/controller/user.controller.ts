@@ -26,3 +26,27 @@ export const updateProfile = async(req:AuthRequest,res:Response,next:NextFunctio
         next(error);
     }
 };
+
+
+export const uploadAvatar = async(req:AuthRequest,res:Response,next:NextFunction)=>{
+    try{
+        if(!req.file){
+            throw new ApiError("No file uploaded",400)
+        }
+        const userId = req.user._id.toString();
+        const result = await userService.updateUserAvatar(userId,req.file.buffer);
+        successResponse(res,200,"Avatar uploaded successfully",result);
+    }catch(error){
+        next(error);
+    }
+};
+
+export const deleteAvatar = async(req:AuthRequest,res:Response,next:NextFunction)=>{
+    try{
+        const userId = req.user._id.toString();
+        await userService.deleteUserAvatar(userId);
+        successResponse(res,200,"Avatar delete successfully");
+    }catch(error){
+        next(error);
+    }
+};
