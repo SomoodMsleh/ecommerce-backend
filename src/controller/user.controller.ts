@@ -50,3 +50,53 @@ export const deleteAvatar = async(req:AuthRequest,res:Response,next:NextFunction
         next(error);
     }
 };
+
+export const getAddresses = async(req:AuthRequest,res:Response,next:NextFunction)=>{
+    try{
+        const userId = req.user._id.toString();
+        const addresses = await userService.getUserAddresses(userId);
+        successResponse(res,200,'Addresses retrieved successfully', addresses);
+    }catch(error){
+        next(error);
+    }
+};
+
+export const addAddresses = async(req:AuthRequest,res:Response,next:NextFunction)=>{
+    try{
+        const address = req.body.address;
+        if(!address){
+            throw new ApiError("Address data is required",400)
+        }
+        const userId = req.user._id.toString();
+        const result = await userService.addUserAddresses(userId,address);
+        successResponse(res,200,'Address retrieved successfully', result);
+    }catch(error){
+        next(error);
+    }
+};
+
+export const updateAddress = async(req:AuthRequest,res:Response,next:NextFunction)=>{
+    try{
+        const address = req.body.address;
+        if(!address){
+            throw new ApiError("Address update data is required",400)
+        }
+        const userId = req.user._id.toString();
+        const addressId = req.params.addressId;
+        const result = await userService.updateUserAddresses(userId,addressId,address);
+        successResponse(res,200,'Address updated successfully', result);
+    }catch(error){
+        next(error);
+    }
+};
+
+export const deleteAddress =  async(req:AuthRequest,res:Response,next:NextFunction)=>{
+    try{
+        const userId = req.user._id.toString();
+        const addressId = req.params.addressId;
+        await userService.deleteUserAddresses(userId,addressId);
+        successResponse(res,200,'Address deleted successfully');
+    }catch(error){
+        next(error);
+    }
+};

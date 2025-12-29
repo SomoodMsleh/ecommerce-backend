@@ -10,6 +10,16 @@ interface UpdateProfileData {
     phoneNumber?: string;
 }
 
+interface AddressData {
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+    isDefault?: boolean;
+};
+
+
 export const getUserProfile = async (userId: string) => {
     const user = await userModel.findById(userId).select('-password');
     if (!user) {
@@ -84,4 +94,82 @@ export const deleteUserAvatar = async(userId:string)=>{
     user.save();
     logger.info(`Avatar deleted for user: ${user.email}`);
     return;
+};
+
+
+export const getUserAddresses = async(userId:string)=>{
+    const user = await userModel.findById(userId).select('addresses');
+    if (!user) {
+        throw new ApiError("User not found", 404)
+    }
+    return user.addresses
+};
+
+
+export const addUserAddresses = async(userId:string,addressData:AddressData)=>{
+    const user = await userModel.findById(userId).select('-password');
+    if (!user) {
+        throw new ApiError("User not found", 404)
+    }
+    user.addresses ??= [];
+    if(addressData.isDefault){
+        user.addresses.forEach((addr)=> {
+            addr.isDefault = false;
+        });
+    }
+    if (user.addresses.length == 0){
+        addressData.isDefault = true;
+    }
+    user.addresses.push(addressData);
+    await user.save();
+    logger.info(`Address added for user: ${user.email}`);
+    return user.addresses[user.addresses.length - 1];
+};
+
+
+
+export const updateUserAddresses = async(userId:string,addressId:string,updateData:Partial<AddressData>)=>{
+    const user = await userModel.findById(userId).select('-password');
+    if (!user) {
+        throw new ApiError("User not found", 404)
+    }
+    if (!user.addresses || user.addresses.length === 0) {
+        throw new ApiError("No addresses found", 404);
+    }
+    const address = user.addresses.id(addressId);
+    if(!address){
+        throw new ApiError("Address not found", 404);
+    }
+    if(updateData.isDefault){
+        user.addresses.forEach((add)=>{
+            add.isDefault = false;
+        });
+    }
+    console.log(address)
+    Object.assign(address,updateData);
+    await user.save();
+    logger.info(`Address updated for user: ${user.email}`);
+    return address;
+};
+
+export const deleteUserAddresses = async(userId:string,addressId:string)=>{
+    const user = await userModel.findById(userId).select('-password');
+    if (!user) {
+        throw new ApiError("User not found", 404)
+    }
+    if (!user.addresses || user.addresses.length === 0) {
+        throw new ApiError("No addresses found", 404);
+    }
+    const address = user.addresses.id(addressId);
+    if(!address){
+        throw new ApiError("Address not found", 404);
+    }
+    const wasDefault = address.isDefault;
+    user.addresses.pull({ _id: addressId });
+    if(wasDefault && user.addresses.length > 0){
+        user.addresses[0].isDefault = true;
+    }
+    await user.save();
+    logger.info(`Address deleted for user: ${user.email}`);
+    return ;
 };

@@ -1,40 +1,44 @@
-import mongoose, { Schema, model, Document } from "mongoose";
+import mongoose, { Schema, model, Document, Types } from "mongoose";
 //Document contains properties (_id, created_At, updated_At) of mongoose
+
+export interface Address {
+    _id: Types.ObjectId;
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+    country: string;
+    isDefault: boolean;
+}
+
 export interface IUser extends Document {
-    username : string;
+    username: string;
     firstName: string;
     lastName: string;
     email: string;
-    password ?: string; 
+    password?: string;
     phoneNumber?: string; // optional property
     role: "customer" | "admin" | "vendor";
     isEmailVerified: boolean;
     twoFactorTempSecret?: string;
-    isTwoFactorEnabled : boolean;
-    twoFactorSecret ?: string;
-    googleId ?: string;
-    facebookId ?: string;
-    avatar ?:  {  secure_url: string , public_id?: string;};
-    addresses ?: Array<{
-        street: string;
-        city: string;
-        state: string;
-        zipCode: string;
-        country: string;
-        isDefault: boolean;
-    }>;
+    isTwoFactorEnabled: boolean;
+    twoFactorSecret?: string;
+    googleId?: string;
+    facebookId?: string;
+    avatar?: { secure_url: string, public_id?: string; };
+    addresses?: Address[];
     verificationCode?: string,
-    verificationCodeExpiresAt?:Date,
-    isActive : boolean;
-    lastLogin ?: Date;
-    resetPasswordToken ?: string,
-    resetPasswordExpiresAt ?: Date,
+    verificationCodeExpiresAt?: Date,
+    isActive: boolean;
+    lastLogin?: Date;
+    resetPasswordToken?: string,
+    resetPasswordExpiresAt?: Date,
     createdAt: Date;
-    updatedAt : Date;
-}; 
+    updatedAt: Date;
+};
 
 const userSchema: Schema<IUser> = new Schema({
-    username:{
+    username: {
         type: String,
         required: [true, "Username is required"],
         unique: true,
@@ -47,12 +51,12 @@ const userSchema: Schema<IUser> = new Schema({
         required: [true, "First name is required"],
         trim: true
     },
-    lastName:{
+    lastName: {
         type: String,
         required: [true, "Last name is required"],
         trim: true
     },
-    email:{
+    email: {
         type: String,
         required: [true, "Email is required"],
         unique: true,
@@ -63,7 +67,7 @@ const userSchema: Schema<IUser> = new Schema({
             "Please provide a valid email address"
         ]
     },
-    password:{
+    password: {
         type: String,
         minlength: [6, "Password must be at least 6 characters"],
         select: false // don`t return password field by default
@@ -73,58 +77,61 @@ const userSchema: Schema<IUser> = new Schema({
         trim: true,
         match: [/^\+?[1-9]\d{1,14}$/, 'Please provide a valid phone number'],
     },
-    role:{
+    role: {
         type: String,
-        enum: ["customer","admin", "vendor"],
+        enum: ["customer", "admin", "vendor"],
         default: "customer"
     },
-    isEmailVerified: { 
-        type: Boolean, 
-        default: false 
+    isEmailVerified: {
+        type: Boolean,
+        default: false
     },
-    isTwoFactorEnabled: { 
-        type: Boolean, 
-        default: false 
+    isTwoFactorEnabled: {
+        type: Boolean,
+        default: false
     },
-    twoFactorTempSecret:{
+    twoFactorTempSecret: {
         type: String
     },
     twoFactorSecret: { type: String },
     googleId: { type: String },
     facebookId: { type: String },
-    avatar:{
+    avatar: {
         secure_url: { type: String },
         public_id: { type: String }
     },
-    addresses:[{
-        street: {type: String},
-        city: {type: String},
-        state: {type: String},
-        zipCode: {type: String},
-        country: {type: String},
-        isDefault: { type: Boolean, default: false },
-    }],
-    verificationCode :{
-        type:String,
+    addresses: {
+        type: [{
+            street: String,
+            city: String,
+            state: String,
+            zipCode: String,
+            country: String,
+            isDefault: { type: Boolean, default: false },
+        }],
+        default: []
+    },
+    verificationCode: {
+        type: String,
         trim: true,
-        unique:true,
+        unique: true,
         sparse: true
     },
-    verificationCodeExpiresAt:{
+    verificationCodeExpiresAt: {
         type: Date,
     },
     isActive: { type: Boolean, default: true },
     lastLogin: { type: Date },
-    resetPasswordToken:{
-        type:String,
+    resetPasswordToken: {
+        type: String,
         trim: true,
-        unique:true,
+        unique: true,
         sparse: true
     },
-    resetPasswordExpiresAt:{
+    resetPasswordExpiresAt: {
         type: Date,
     }
-},{
+}, {
     timestamps: true,
 });
 

@@ -14,4 +14,10 @@ router.put('/profile',authenticate,asyncHandler(userController.updateProfile));
 router.post('/avatar',authenticate,fileUpload(fileValidation.image).single('avatar'),asyncHandler(userController.uploadAvatar));
 router.delete('/avatar',authenticate,asyncHandler(userController.deleteAvatar));
 
+router.get('/addresses',authenticate,asyncHandler(userController.getAddresses));
+router.post('/addresses',authenticate,asyncHandler(userController.addAddresses));
+router.put('/addresses/:addressId',authenticate,asyncHandler(userController.updateAddress));
+router.delete('/addresses/:addressId',authenticate,asyncHandler(userController.deleteAddress));
+
+
 export default router;
