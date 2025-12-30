@@ -2,8 +2,10 @@ import userModel from "../models/User.model.js";
 import ApiError from "../utils/error.util.js";
 import { hashPassword, comparePassword } from "../utils/bcrypt.util.js";
 import logger from "../utils/logger.util.js";
-import {uploadToCloudinary,deleteFromCloudinary} from "../utils/cloudinary.util.js";
-
+import { uploadToCloudinary, deleteFromCloudinary } from "../utils/cloudinary.util.js";
+import speakeasy from "speakeasy";
+import { valid } from "joi";
+import { compare } from "bcryptjs";
 interface UpdateProfileData {
     firstName?: string;
     lastName?: string;
@@ -28,18 +30,18 @@ export const getUserProfile = async (userId: string) => {
     return user;
 };
 
-export const updateUserProfile = async (userId: string,updateData:UpdateProfileData) => {
+export const updateUserProfile = async (userId: string, updateData: UpdateProfileData) => {
     const user = await userModel.findById(userId).select('-password');
     if (!user) {
         throw new ApiError("User not found", 404)
     }
-    if(updateData.firstName){
+    if (updateData.firstName) {
         user.firstName = updateData.firstName;
     }
-    if(updateData.lastName){
+    if (updateData.lastName) {
         user.lastName = updateData.lastName
     }
-    if(updateData.phoneNumber){
+    if (updateData.phoneNumber) {
         user.phoneNumber = updateData.phoneNumber;
     }
 
@@ -48,45 +50,45 @@ export const updateUserProfile = async (userId: string,updateData:UpdateProfileD
     return await userModel.findById(userId).select('-password');
 };
 
-export const updateUserAvatar = async(userId:string,buffer:Buffer)=>{
+export const updateUserAvatar = async (userId: string, buffer: Buffer) => {
     const user = await userModel.findById(userId).select('-password');
     if (!user) {
         throw new ApiError("User not found", 404)
     }
 
-    if(user.avatar?.public_id){
-        try{
+    if (user.avatar?.public_id) {
+        try {
             await deleteFromCloudinary(user.avatar.public_id);
-        }catch(error){
+        } catch (error) {
             logger.error('Failed to delete old avatar:', error);
         }
     }
 
-    try{
-        const {secure_url,public_id} = await uploadToCloudinary(buffer,`${process.env.APP_NAME}/users/avatar/${user._id.toString()}`);
-        user.avatar = {secure_url,public_id};
+    try {
+        const { secure_url, public_id } = await uploadToCloudinary(buffer, `${process.env.APP_NAME}/users/avatar/${user._id.toString()}`);
+        user.avatar = { secure_url, public_id };
         await user.save();
-    }catch(error){
+    } catch (error) {
         logger.error('Failed to upload new avatar:', error);
         throw new ApiError("Image upload failed", 500);
     }
     logger.info(`Avatar updated for user: ${user.email}`);
-    return {avatar:user.avatar.secure_url};
+    return { avatar: user.avatar.secure_url };
 };
 
-export const deleteUserAvatar = async(userId:string)=>{
+export const deleteUserAvatar = async (userId: string) => {
     const user = await userModel.findById(userId).select('-password');
     if (!user) {
         throw new ApiError("User not found", 404)
     }
     if (!user.avatar) {
-        throw new ApiError('No avatar to delete',400);
+        throw new ApiError('No avatar to delete', 400);
     }
 
-    if(user.avatar?.public_id){
-        try{
+    if (user.avatar?.public_id) {
+        try {
             await deleteFromCloudinary(user.avatar.public_id);
-        }catch(error){
+        } catch (error) {
             logger.error('Failed to delete avatar from cloudinary:', error);
         }
     }
@@ -97,7 +99,7 @@ export const deleteUserAvatar = async(userId:string)=>{
 };
 
 
-export const getUserAddresses = async(userId:string)=>{
+export const getUserAddresses = async (userId: string) => {
     const user = await userModel.findById(userId).select('addresses');
     if (!user) {
         throw new ApiError("User not found", 404)
@@ -106,18 +108,18 @@ export const getUserAddresses = async(userId:string)=>{
 };
 
 
-export const addUserAddresses = async(userId:string,addressData:AddressData)=>{
+export const addUserAddresses = async (userId: string, addressData: AddressData) => {
     const user = await userModel.findById(userId).select('-password');
     if (!user) {
         throw new ApiError("User not found", 404)
     }
     user.addresses ??= [];
-    if(addressData.isDefault){
-        user.addresses.forEach((addr)=> {
+    if (addressData.isDefault) {
+        user.addresses.forEach((addr) => {
             addr.isDefault = false;
         });
     }
-    if (user.addresses.length == 0){
+    if (user.addresses.length == 0) {
         addressData.isDefault = true;
     }
     user.addresses.push(addressData);
@@ -128,7 +130,7 @@ export const addUserAddresses = async(userId:string,addressData:AddressData)=>{
 
 
 
-export const updateUserAddresses = async(userId:string,addressId:string,updateData:Partial<AddressData>)=>{
+export const updateUserAddresses = async (userId: string, addressId: string, updateData: Partial<AddressData>) => {
     const user = await userModel.findById(userId).select('-password');
     if (!user) {
         throw new ApiError("User not found", 404)
@@ -137,22 +139,22 @@ export const updateUserAddresses = async(userId:string,addressId:string,updateDa
         throw new ApiError("No addresses found", 404);
     }
     const address = user.addresses.id(addressId);
-    if(!address){
+    if (!address) {
         throw new ApiError("Address not found", 404);
     }
-    if(updateData.isDefault){
-        user.addresses.forEach((add)=>{
+    if (updateData.isDefault) {
+        user.addresses.forEach((add) => {
             add.isDefault = false;
         });
     }
     console.log(address)
-    Object.assign(address,updateData);
+    Object.assign(address, updateData);
     await user.save();
     logger.info(`Address updated for user: ${user.email}`);
     return address;
 };
 
-export const deleteUserAddresses = async(userId:string,addressId:string)=>{
+export const deleteUserAddresses = async (userId: string, addressId: string) => {
     const user = await userModel.findById(userId).select('-password');
     if (!user) {
         throw new ApiError("User not found", 404)
@@ -161,15 +163,59 @@ export const deleteUserAddresses = async(userId:string,addressId:string)=>{
         throw new ApiError("No addresses found", 404);
     }
     const address = user.addresses.id(addressId);
-    if(!address){
+    if (!address) {
         throw new ApiError("Address not found", 404);
     }
     const wasDefault = address.isDefault;
     user.addresses.pull({ _id: addressId });
-    if(wasDefault && user.addresses.length > 0){
+    if (wasDefault && user.addresses.length > 0) {
         user.addresses[0].isDefault = true;
     }
     await user.save();
     logger.info(`Address deleted for user: ${user.email}`);
-    return ;
+    return;
 };
+
+export const changeUserPassword = async (userId: string, newPassword: string, currentPassword?: string, otp?: string) => {
+    const user = await userModel.findById(userId).select('+password');
+    if (!user) {
+        throw new ApiError("User not found", 404);
+    }
+    const hasPassword = Boolean(user.password);
+    if (user.isTwoFactorEnabled){
+        if(!otp){
+            throw new ApiError("OTP is required",400)
+        }
+        const verified = speakeasy.totp.verify({
+            secret: user.twoFactorSecret!,
+            encoding: 'base32',
+            token: otp,
+            window: 2})
+        if (!verified){
+            throw new ApiError("Invalid OTP",401);
+        }
+    }
+
+    if(hasPassword){
+        if(!currentPassword){
+            throw new ApiError("Current password is required", 400);
+        }
+        const isPasswordValid = await comparePassword(currentPassword,user.password);
+        if(!isPasswordValid){
+            throw new ApiError("Current password is incorrect", 401);
+        }
+        const same = await comparePassword(newPassword,user.password);
+        if(same){
+            throw new ApiError("New password must be different", 400);
+        }
+    }
+
+    user.password = await hashPassword(newPassword!);
+    await user.save()
+
+    logger.info(`Password changed for user: ${user.email}`);
+    return;
+
+};
+
+

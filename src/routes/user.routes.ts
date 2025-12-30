@@ -19,5 +19,5 @@ router.post('/addresses',authenticate,asyncHandler(userController.addAddresses))
 router.put('/addresses/:addressId',authenticate,asyncHandler(userController.updateAddress));
 router.delete('/addresses/:addressId',authenticate,asyncHandler(userController.deleteAddress));
 
-
+router.put('/changePassword',authenticate,asyncHandler(userController.changePassword));
 export default router;

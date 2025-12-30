@@ -100,3 +100,18 @@ export const deleteAddress =  async(req:AuthRequest,res:Response,next:NextFuncti
         next(error);
     }
 };
+
+export const changePassword =  async(req:AuthRequest,res:Response,next:NextFunction)=>{
+    try{
+        const {currentPassword,otp,newPassword} = req.body;
+        if (!newPassword) {
+            throw new ApiError("New password is required", 400);
+        }
+        const userId = req.user._id.toString();
+        const result = await userService.changeUserPassword(userId,newPassword,currentPassword,otp);
+        successResponse(res, 200, 'Password changed successfully', result);
+    }catch(error){
+        next(error);
+    }
+};
+
