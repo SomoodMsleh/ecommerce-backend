@@ -1,11 +1,17 @@
 import userModel from "../models/User.model.js";
+import RefreshTokenModel from "../models/RefreshToken.model.js";
 import ApiError from "../utils/error.util.js";
 import { hashPassword, comparePassword } from "../utils/bcrypt.util.js";
 import logger from "../utils/logger.util.js";
 import { uploadToCloudinary, deleteFromCloudinary } from "../utils/cloudinary.util.js";
 import speakeasy from "speakeasy";
-import { valid } from "joi";
-import { compare } from "bcryptjs";
+import { sendEmail } from "./email.service.js";
+import {accountRestoreRequestTemplate,accountRestoreSuccessTemplate} from "../emailTemplates/accountRestoreTemplate.js"
+import crypto from "node:crypto";
+import {clearAuthCookies} from "../utils/jwt.util.js";
+import { Response } from "express";
+
+const ACCOUNT_RESTORE_TOKEN_SIZE = 20;
 interface UpdateProfileData {
     firstName?: string;
     lastName?: string;
@@ -128,8 +134,6 @@ export const addUserAddresses = async (userId: string, addressData: AddressData)
     return user.addresses[user.addresses.length - 1];
 };
 
-
-
 export const updateUserAddresses = async (userId: string, addressId: string, updateData: Partial<AddressData>) => {
     const user = await userModel.findById(userId).select('-password');
     if (!user) {
@@ -218,4 +222,81 @@ export const changeUserPassword = async (userId: string, newPassword: string, cu
 
 };
 
+export const deleteUserAccount = async (res:Response,userId: string, password?: string, otp?: string) => {
+    const user = await userModel.findById(userId).select('+password');
+    if (!user) {
+        throw new ApiError("User not found", 404);
+    }
+    const hasPassword = Boolean(user.password);
+    if (user.isTwoFactorEnabled){
+        if(!otp){
+            throw new ApiError("OTP is required",400)
+        }
+        const verified = speakeasy.totp.verify({
+            secret: user.twoFactorSecret!,
+            encoding: 'base32',
+            token: otp,
+            window: 2})
+        if (!verified){
+            throw new ApiError("Invalid OTP",401);
+        }
+    }
 
+    if(hasPassword){
+        if(!password){
+            throw new ApiError("Password is required", 400);
+        }
+        const isPasswordValid = await comparePassword(password,user.password);
+        if(!isPasswordValid){
+            throw new ApiError("Current password is incorrect", 401);
+        }
+    }
+    const restoreToken = crypto.randomBytes(ACCOUNT_RESTORE_TOKEN_SIZE).toString('hex');
+    const restoreTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const hashedToken = crypto.createHash('sha256').update(restoreToken).digest('hex');
+    const now = new Date(); 
+    user.isActive = false;
+    user.deletedAt = now;
+    user.deleteAfter = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    user.restoreToken = hashedToken;
+    user.restoreTokenExpiresAt = restoreTokenExpiresAt;
+    await user.save();
+    await RefreshTokenModel.deleteMany({ user: userId });
+    const restoreLink = `${process.env.CLIENT_URL}/api/users/account/restore/${restoreToken}`;
+    const subject = "Restore your account";
+    const html = accountRestoreRequestTemplate.replace('{restoreURL}',restoreLink);
+    await sendEmail({to:user.email,subject,html});
+    logger.info(`Account deleted for user: ${user.email}`);
+    clearAuthCookies(res)
+    return;
+};
+
+export const restoreUserAccount = async(token:string) => {
+    const hashedToken = crypto
+        .createHash('sha256')
+        .update(token)
+        .digest('hex');
+
+    const user = await userModel.findOne({
+        restoreToken: hashedToken,
+        restoreTokenExpiresAt: { $gt: new Date() },
+        isActive: false
+    });
+
+    if (!user) {
+        throw new ApiError("Restore token is invalid or expired", 400);
+    }
+
+    user.isActive = true;
+    user.deletedAt = null;
+    user.deleteAfter = null;
+    user.restoreToken = null;
+    user.restoreTokenExpiresAt = null;
+
+    await user.save();
+    const subject = "Account restored successfully";
+    const loginUrl = `${process.env.CLIENT_URL}/api/auth/login`;
+    const html = accountRestoreSuccessTemplate.replace('{loginURL}', loginUrl);
+    await sendEmail({to:user.email,subject,html});
+    logger.info(`Account restored for user: ${user.email}`);
+};

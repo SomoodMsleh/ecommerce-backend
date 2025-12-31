@@ -30,6 +30,10 @@ export interface IUser extends Document {
     verificationCode?: string,
     verificationCodeExpiresAt?: Date,
     isActive: boolean;
+    deletedAt?: Date;
+    deleteAfter?: Date;
+    restoreToken?: string;
+    restoreTokenExpiresAt?: Date;
     lastLogin?: Date;
     resetPasswordToken?: string,
     resetPasswordExpiresAt?: Date,
@@ -121,6 +125,17 @@ const userSchema: Schema<IUser> = new Schema({
         type: Date,
     },
     isActive: { type: Boolean, default: true },
+    deletedAt:{type: Date},
+    deleteAfter: {type: Date},
+    restoreToken: {
+        type: String,
+        trim: true,
+        unique: true,
+        sparse: true
+    },
+    restoreTokenExpiresAt:{
+        type: Date,
+    },
     lastLogin: { type: Date },
     resetPasswordToken: {
         type: String,

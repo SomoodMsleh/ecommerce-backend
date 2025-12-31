@@ -148,7 +148,7 @@ export const userForgetPassword = async (email: string) => {
     user.resetPasswordExpiresAt = resetTokenExpiresAt;
 
     await user.save();
-    const resetURL = `${process.env.CLIENT_URL}/auth/resetPassword/${resetToken}`;
+    const resetURL = `${process.env.CLIENT_URL}/api/auth/resetPassword/${resetToken}`;
     const subject = "Reset your password";
     const html = passwordResetRequestTemplate.replace("{resetURL}", resetURL);
     await sendEmail({ to: email, subject, html });

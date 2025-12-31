@@ -20,4 +20,7 @@ router.put('/addresses/:addressId',authenticate,asyncHandler(userController.upda
 router.delete('/addresses/:addressId',authenticate,asyncHandler(userController.deleteAddress));
 
 router.put('/changePassword',authenticate,asyncHandler(userController.changePassword));
+
+router.delete('/account/delete',authenticate,asyncHandler(userController.deleteAccount));
+router.get('/account/restore/:restoreToken',asyncHandler(userController.restoreAccount));
 export default router;

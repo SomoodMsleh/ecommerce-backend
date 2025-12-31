@@ -1,4 +1,4 @@
-import { Response,NextFunction } from "express";
+import { Request,Response,NextFunction } from "express";
 import { AuthRequest } from "../middlewares/auth.middleware.js";
 import { successResponse } from "../utils/response.util.js";
 import ApiError from "../utils/error.util.js";
@@ -108,10 +108,34 @@ export const changePassword =  async(req:AuthRequest,res:Response,next:NextFunct
             throw new ApiError("New password is required", 400);
         }
         const userId = req.user._id.toString();
-        const result = await userService.changeUserPassword(userId,newPassword,currentPassword,otp);
-        successResponse(res, 200, 'Password changed successfully', result);
+        await userService.changeUserPassword(userId,newPassword,currentPassword,otp);
+        successResponse(res, 200, 'Password changed successfully');
     }catch(error){
         next(error);
     }
 };
 
+
+export const deleteAccount = async(req:AuthRequest,res:Response,next:NextFunction)=>{
+    try{
+        const {password,otp} = req.body;
+        const userId = req.user._id.toString();
+        await userService.deleteUserAccount(res,userId,password,otp);
+        successResponse(res, 200, 'Account deleted successfully');
+    }catch(error){
+        next(error);
+    }
+};
+
+export const restoreAccount = async(req:Request,res:Response,next:NextFunction)=>{
+    try{
+        const { restoreToken } = req.params;
+        if (!restoreToken) {
+            throw new ApiError("Restore token is required", 400);
+        }
+        await userService.restoreUserAccount(restoreToken);
+        successResponse(res, 200, "Account restored successfully");
+    }catch(error){
+        next(error);
+    }
+};
