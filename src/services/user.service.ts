@@ -262,7 +262,7 @@ export const deleteUserAccount = async (res:Response,userId: string, password?: 
     user.restoreTokenExpiresAt = restoreTokenExpiresAt;
     await user.save();
     await RefreshTokenModel.deleteMany({ user: userId });
-    const restoreLink = `${process.env.CLIENT_URL}/api/users/account/restore/${restoreToken}`;
+    const restoreLink = `${process.env.CLIENT_URL}/api/v1/users/account/restore/${restoreToken}`;
     const subject = "Restore your account";
     const html = accountRestoreRequestTemplate.replace('{restoreURL}',restoreLink);
     await sendEmail({to:user.email,subject,html});
@@ -288,14 +288,14 @@ export const restoreUserAccount = async(token:string) => {
     }
 
     user.isActive = true;
-    user.deletedAt = null;
-    user.deleteAfter = null;
-    user.restoreToken = null;
-    user.restoreTokenExpiresAt = null;
+    user.deletedAt = undefined;
+    user.deleteAfter = undefined;
+    user.restoreToken = undefined;
+    user.restoreTokenExpiresAt = undefined;
 
     await user.save();
     const subject = "Account restored successfully";
-    const loginUrl = `${process.env.CLIENT_URL}/api/auth/login`;
+    const loginUrl = `${process.env.CLIENT_URL}/api/v1/auth/login`;
     const html = accountRestoreSuccessTemplate.replace('{loginURL}', loginUrl);
     await sendEmail({to:user.email,subject,html});
     logger.info(`Account restored for user: ${user.email}`);
