@@ -252,6 +252,9 @@ export const verify2FALogin = async (res: Response, userId: string, otp: string)
     if (!user) {
         throw new ApiError("User not found", 404);
     }
+    if (!user.isActive) {
+        throw new ApiError("Account is deactivated", 403);
+    }
     if (!user.isTwoFactorEnabled || !user.twoFactorSecret) {
         throw new ApiError("2FA is not enabled for this account", 400);
     }
@@ -286,19 +289,27 @@ export const verify2FALogin = async (res: Response, userId: string, otp: string)
 };
 
 // Require valid 2FA code in addition to password to disable 2FA
-export const disable2FA = async (userId: string, password: string, otp?: string) => {
+export const disable2FA = async (userId: string, password?: string, otp?: string) => {
     const user = await userModel.findById(userId).select('+password');
-    if (!user || !user.password) {
+    if (!user) {
         throw new ApiError("User not found", 404);
     }
-
+    if (!user.isActive) {
+        throw new ApiError("Account is deactivated", 403);
+    }
     if (!user.isTwoFactorEnabled || !user.twoFactorSecret) {
         throw new ApiError("2FA is not enabled", 400);
     }
 
-    const isPasswordValid = await comparePassword(password, user.password);
-    if (!isPasswordValid) {
-        throw new ApiError("Invalid credentials", 401);
+    if (user.password) {
+        if (!password) {
+            throw new ApiError("Password is required", 400);
+        }
+
+        const isPasswordValid = await comparePassword(password, user.password);
+        if (!isPasswordValid) {
+            throw new ApiError("Invalid password", 401);
+        }
     }
     if (!otp) {
         throw new ApiError("2FA code is required to disable 2FA", 400);
@@ -318,12 +329,24 @@ export const disable2FA = async (userId: string, password: string, otp?: string)
     user.twoFactorTempSecret = undefined;
     await user.save();
 
-    return;
+    return { message: "Two-factor authentication disabled successfully"};
 };
 
 
-export const handleOAuthSuccess = async (req: Request,res:Response, user: any) => {
+export const handleOAuthSuccess = async (req: Request, res: Response, user: any) => {
+    if (!user.isActive) {
+        throw new ApiError("Account is deactivated", 403);
+    }
     logger.info(`OAuth success for user: ${user.email}`);
+
+    if (user.isTwoFactorEnabled) {
+        return {
+            requires2FA: true,
+            userId: user._id,
+            message: "2FA verification required",
+        };
+    }
+
     const accessToken = generateToken(res, {
         userId: user._id.toString(),
         role: user.role,
@@ -332,9 +355,10 @@ export const handleOAuthSuccess = async (req: Request,res:Response, user: any) =
     const refreshToken = await generateRefreshToken(res, user._id.toString());
 
     return {
+        requires2FA: false,
         user: {
             id: user._id,
-            username:user.username,
+            username: user.username,
             firstName: user.firstName,
             lastName: user.lastName,
             email: user.email,

@@ -143,8 +143,8 @@ export const disable2FA = async (req: AuthRequest, res: Response, next: NextFunc
             throw new ApiError("Password is required", 400);
         }
         const userId = req.user._id.toString();
-        await authServices.disable2FA(userId, password, otp);
-        successResponse(res, 200, '2FA disabled successfully');
+        const result = await authServices.disable2FA(userId, password, otp);
+        successResponse(res, 200, '2FA disabled successfully', result);
     } catch (error) {
         next(error)
     }

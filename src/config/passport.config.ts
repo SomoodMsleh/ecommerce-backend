@@ -6,7 +6,7 @@ import ApiError from "../utils/error.util.js";
 import userModel from "../models/User.model.js";
 
 const generateUsername = (email: string) =>
-  `${email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "")}${Date.now()}`;
+    `${email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "")}${Date.now()}`;
 
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID!,
@@ -27,12 +27,15 @@ passport.use(new GoogleStrategy({
             }
 
             if (user) {
+                if (!user.isActive) {
+                    throw new ApiError("Account is deactivated. Please restore your account.", 403);
+                }
                 if (!user.googleId) {
                     user.googleId = profile.id;
                 }
                 user.isEmailVerified = true;
                 if (!user.avatar?.secure_url && profile.photos?.[0]?.value) {
-                    user.avatar = {  secure_url: profile.photos?.[0]?.value };
+                    user.avatar = { secure_url: profile.photos?.[0]?.value };
                 }
                 user.lastLogin = new Date();
                 await user.save();
@@ -45,7 +48,7 @@ passport.use(new GoogleStrategy({
                 firstName: profile.name?.givenName || "user",
                 lastName: profile.name?.familyName || "",
                 username: generateUsername(email),
-                avatar: {  secure_url: profile.photos?.[0]?.value },
+                avatar: { secure_url: profile.photos?.[0]?.value },
                 isEmailVerified: true,
                 isActive: true,
                 lastLogin: new Date()
@@ -65,10 +68,10 @@ passport.use(new FacebookStrategy({
     clientID: process.env.FACEBOOK_APP_ID!,
     clientSecret: process.env.FACEBOOK_APP_SECRET!,
     callbackURL: process.env.FACEBOOK_CALLBACK_URL || `${process.env.CLIENT_URL}/api/v1/auth/facebook/callback`,
-    profileFields:['id','emails','name','picture.type(large)']
+    profileFields: ['id', 'emails', 'name', 'picture.type(large)']
 },
-    async (accessToken:string, refreshToken:string, profile:any, done:any) => {
-        try{
+    async (accessToken: string, refreshToken: string, profile: any, done: any) => {
+        try {
             const email = profile.emails?.[0]?.value;
             logger.info(`Facebook OAuth attempt for email: ${email}`);
             if (!email) {
@@ -81,6 +84,9 @@ passport.use(new FacebookStrategy({
             }
 
             if (user) {
+                if (!user.isActive) {
+                    throw new ApiError("Account is deactivated. Please restore your account.", 403);
+                }
                 if (!user.facebookId) {
                     user.facebookId = profile.id;
                 }
@@ -100,7 +106,7 @@ passport.use(new FacebookStrategy({
                 firstName: profile.name?.givenName || "user",
                 lastName: profile.name?.familyName || "",
                 username: generateUsername(email),
-                avatar: {  secure_url: profile.photos?.[0]?.value },
+                avatar: { secure_url: profile.photos?.[0]?.value },
                 isEmailVerified: true,
                 isActive: true,
                 lastLogin: new Date()
@@ -108,7 +114,7 @@ passport.use(new FacebookStrategy({
             logger.info(`Created new user via Facebook OAuth: ${newUser.email}`);
             return done(null, newUser);
 
-        }catch(error){
+        } catch (error) {
             logger.error('Facebook OAuth error:', error);
             return done(error as Error, undefined)
         }
