@@ -3,10 +3,13 @@ dotenv.config();
 import app from './app.js';
 import logger from './utils/logger.util.js';
 import connectDB from './config/database.config.js';
+import redisClient from './config/redis.config.js';
 const PORT = process.env.PORT || 3000;
 const startServer  = async():Promise<void> => {
     try{
         await connectDB(); 
+        await redisClient.ping();
+        logger.info("✅ Redis connected successfully");
         app.listen(PORT,()=>{
             logger.info(`🚀 server is running on http://localhost:${PORT} ....`);
             logger.info(`📍 Environment: ${process.env.NODE_ENV}`);

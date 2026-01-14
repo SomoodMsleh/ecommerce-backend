@@ -4,7 +4,7 @@ import authenticate from "../middlewares/auth.middleware.js";
 import validation from '../middlewares/validate.middleware.js';
 import * as userController from "../controller/user.controller.js";
 import fileUpload ,{fileValidation} from "../middlewares/upload.middleware.js";
-import * as userValidation from "../validators/user.validator.js"
+import * as userValidation from "../validators/user.validator.js";
 
 const router = Router();
 
