@@ -1,20 +1,55 @@
-import {Redis} from "ioredis";
+import { Redis } from "ioredis";
 import logger from "../utils/logger.util.js";
+
+// Create a Redis client (Singleton connection)
 const redisClient = new Redis({
-    host: process.env.REDIS_HOST ?? "127.0.0.1",
-    port: parseInt(process.env.REDIS_PORT || "6379"),
+    // Redis server host (from environment variables or localhost)
+    host: process.env.REDIS_HOST || "127.0.0.1",
+
+    // Redis server port (default: 6379)
+    port: parseInt(process.env.REDIS_PORT || "6379", 10),
+
+    // Redis password if authentication is enabled
     password: process.env.REDIS_PASSWORD || undefined,
-    retryStrategy: (times:number) => {
+
+    // Redis reconnection strategy
+    // times => number of reconnection attempts
+    retryStrategy: (times: number) => {
+        // Increase delay gradually, max 2 seconds
         const delay = Math.min(times * 50, 2000);
         return delay;
     },
+
+    // Delay connection until the first Redis command is executed
     lazyConnect: true,
+
+    // Disable request retry limit (useful for queues and background jobs)
     maxRetriesPerRequest: null,
 });
+
+// =======================
+// Event Listeners
+// =======================
+
+// Triggered when Redis connects successfully
 redisClient.on("connect", () => {
     logger.info("✅ Redis connected successfully");
 });
+
+// Triggered when a Redis error occurs
 redisClient.on("error", (error) => {
     logger.error("❌ Redis connection error:", error);
 });
+
+// =======================
+// Graceful Shutdown
+// =======================
+
+// Close Redis connection when the app is terminated (Ctrl + C)
+process.on("SIGINT", async () => {
+    await redisClient.quit();
+    logger.info("🛑 Redis connection closed");
+    process.exit(0);
+});
+
 export default redisClient;
