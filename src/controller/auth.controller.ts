@@ -8,8 +8,28 @@ import ApiError from "../utils/error.util.js";
 
 export const register = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        if (!req.body.username || !req.body.firstName || !req.body.lastName || !req.body.password || !req.body.email) {
-            throw new ApiError("Missing required fields", 400)
+        // Validate input
+        if (!req.body.username?.trim() || !req.body.email?.trim() || !req.body.password) {
+            throw new ApiError('Username, email, and password are required', 400);
+        }
+
+        if (!req.body.firstName?.trim() || !req.body.lastName?.trim()) {
+            throw new ApiError('First name and last name are required', 400);
+        }
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(req.body.email)) {
+            throw new ApiError('Invalid email format', 400);
+        }
+
+        // Validate username format (alphanumeric, underscore, hyphen only)
+        const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+        if (!usernameRegex.test(req.body.username)) {
+            throw new ApiError('Username can only contain letters, numbers, underscores, and hyphens', 400);
+        }
+
+        if (req.body.username.length < 3 || req.body.username.length > 30) {
+            throw new ApiError('Username must be between 3 and 30 characters', 400);
         }
         const result = await authServices.registerUser(req.body);
         successResponse(res, 201, 'Registration successful', result);
@@ -21,9 +41,9 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 export const isEmailVerified = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const verificationCode = req.body.verificationCode;
-        if (!verificationCode) {
-            throw new ApiError("Verification code is required", 400);
-        }
+        if (!verificationCode?.trim()) {
+                throw new ApiError("Verification code is required", 400);
+            }
         const result = await authServices.verifyEmail(verificationCode);
         successResponse(res, 200, "Email verified successfully. You can now login.", result);
     } catch (error) {
@@ -34,7 +54,7 @@ export const isEmailVerified = async (req: Request, res: Response, next: NextFun
 export const login = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { email, password } = req.body;
-        if (!email || !password) {
+        if (!email?.trim() || !password) {
             throw new ApiError("Email and password are required", 400);
         }
         const result = await authServices.loginUser(res, email, password);
@@ -47,7 +67,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
 export const forgetPassword = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const email = req.body.email;
-        if (!email) {
+        if (!email?.trim()) {
             throw new ApiError("Email is required", 400);
         }
         const result = await authServices.userForgetPassword(email);
@@ -61,7 +81,7 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
     try {
         const token = req.params.token;
         const password = req.body.password;
-        if (!token || !password) {
+        if (!token?.trim() || !password) {
             throw new ApiError("Token and password are required", 400);
         }
         const result = await authServices.userResetPassword(token, password);
@@ -110,7 +130,7 @@ export const enable2FA = async (req: AuthRequest, res: Response, next: NextFunct
 export const verify2FA = async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
         const token = req.body.token;
-        if (!token) {
+        if (!token?.trim()) {
             throw new ApiError("2FA token is required", 400);
         }
         const userId = req.user._id.toString();
@@ -124,8 +144,11 @@ export const verify2FA = async (req: AuthRequest, res: Response, next: NextFunct
 export const verify2FALogin = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { userId, token } = req.body;
-        if (!userId || !token) {
-            throw new ApiError("UserId and 2FA token are required", 400);
+        if (!userId) {
+            throw new ApiError("UserId is required", 400);
+        }
+        if (!token?.trim()) {
+            throw new ApiError("2FA code is required", 400);
         }
 
         const result = await authServices.verify2FALogin(res, userId, token);
