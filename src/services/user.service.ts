@@ -10,8 +10,11 @@ import {accountRestoreRequestTemplate,accountRestoreSuccessTemplate} from "../em
 import crypto from "node:crypto";
 import {clearAuthCookies} from "../utils/jwt.util.js";
 import { Response } from "express";
+import redisClient from "../config/redis.config.js";
+import { generateRefreshToken } from "../utils/jwt.util.js";
 
-const ACCOUNT_RESTORE_TOKEN_SIZE = 20;
+const ACCOUNT_RESTORE_TOKEN_SIZE = 32;
+const ACCOUNT_RESTORE_EXPIRY_DAYS = 30;
 interface UpdateProfileData {
     firstName?: string;
     lastName?: string;
@@ -27,11 +30,41 @@ interface AddressData {
     isDefault?: boolean;
 };
 
+// Helper to track password change attempts
+export const checkPasswordChangeAttempts = async (userId: string): Promise<void> => {
+    const key = `pwd_change:${userId}`;
+    const attempts = await redisClient.get(key);
+    
+    if (attempts && parseInt(attempts) >= 3) {
+        const ttl = await redisClient.ttl(key);
+        throw new ApiError(
+            `Too many password change attempts. Try again in ${Math.ceil(ttl / 60)} minutes`,
+            429
+        );
+    }
+};
+
+// Helper to record password change attempt
+export const recordPasswordChangeAttempt = async (userId: string): Promise<void> => {
+    const key = `pwd_change:${userId}`;
+    const current = await redisClient.incr(key);
+    
+    if (current === 1) {
+        await redisClient.expire(key, 60 * 60); // 1 hour
+    }
+};
+// Helper to clear password change attempts on success
+export const clearPasswordChangeAttempts = async (userId: string): Promise<void> => {
+    await redisClient.del(`pwd_change:${userId}`);
+};
 
 export const getUserProfile = async (userId: string) => {
     const user = await userModel.findById(userId).select('-password');
     if (!user) {
         throw new ApiError("User not found", 404)
+    }
+    if (!user.isActive) {
+        throw new ApiError("Account is deactivated", 403);
     }
     return user;
 };
@@ -41,14 +74,33 @@ export const updateUserProfile = async (userId: string, updateData: UpdateProfil
     if (!user) {
         throw new ApiError("User not found", 404)
     }
+    if (!user.isActive) {
+        throw new ApiError("Account is deactivated", 403);
+    }
+    // Validate phone number format if provided
+    if (updateData.phoneNumber && updateData.phoneNumber.trim()) {
+        const phoneRegex = /^\+?[\d\s\-()]+$/;
+        if (!phoneRegex.test(updateData.phoneNumber)) {
+            throw new ApiError("Invalid phone number format", 400);
+        }
+    }
+
+    // Validate name fields
+    if (updateData.firstName && updateData.firstName.trim().length < 1) {
+        throw new ApiError("First name cannot be empty", 400);
+    }
+    if (updateData.lastName && updateData.lastName.trim().length < 1) {
+        throw new ApiError("Last name cannot be empty", 400);
+    }
+
     if (updateData.firstName) {
-        user.firstName = updateData.firstName;
+        user.firstName = updateData.firstName.trim();
     }
     if (updateData.lastName) {
-        user.lastName = updateData.lastName
+        user.lastName = updateData.lastName.trim();
     }
     if (updateData.phoneNumber) {
-        user.phoneNumber = updateData.phoneNumber;
+        user.phoneNumber = updateData.phoneNumber.trim();
     }
 
     await user.save();
@@ -60,6 +112,9 @@ export const updateUserAvatar = async (userId: string, buffer: Buffer) => {
     const user = await userModel.findById(userId).select('-password');
     if (!user) {
         throw new ApiError("User not found", 404)
+    }
+    if (!user.isActive) {
+        throw new ApiError("Account is deactivated", 403);
     }
 
     if (user.avatar?.public_id) {
@@ -74,18 +129,21 @@ export const updateUserAvatar = async (userId: string, buffer: Buffer) => {
         const { secure_url, public_id } = await uploadToCloudinary(buffer, `${process.env.APP_NAME}/users/avatar/${user._id.toString()}`);
         user.avatar = { secure_url, public_id };
         await user.save();
+        logger.info(`Avatar updated for user: ${user.email}`);
+        return { avatar: user.avatar.secure_url };
     } catch (error) {
         logger.error('Failed to upload new avatar:', error);
         throw new ApiError("Image upload failed", 500);
     }
-    logger.info(`Avatar updated for user: ${user.email}`);
-    return { avatar: user.avatar.secure_url };
 };
 
 export const deleteUserAvatar = async (userId: string) => {
     const user = await userModel.findById(userId).select('-password');
     if (!user) {
         throw new ApiError("User not found", 404)
+    }
+    if (!user.isActive) {
+        throw new ApiError("Account is deactivated", 403);
     }
     if (!user.avatar) {
         throw new ApiError('No avatar to delete', 400);
@@ -110,7 +168,10 @@ export const getUserAddresses = async (userId: string) => {
     if (!user) {
         throw new ApiError("User not found", 404)
     }
-    return user.addresses
+    if (!user.isActive) {
+        throw new ApiError("Account is deactivated", 403);
+    }
+    return user.addresses || [];
 };
 
 
@@ -119,12 +180,17 @@ export const addUserAddresses = async (userId: string, addressData: AddressData)
     if (!user) {
         throw new ApiError("User not found", 404)
     }
+    if (!user.isActive) {
+        throw new ApiError("Account is deactivated", 403);
+    }
+
     user.addresses ??= [];
     if (addressData.isDefault) {
         user.addresses.forEach((addr) => {
             addr.isDefault = false;
         });
     }
+
     if (user.addresses.length == 0) {
         addressData.isDefault = true;
     }
@@ -139,12 +205,31 @@ export const updateUserAddresses = async (userId: string, addressId: string, upd
     if (!user) {
         throw new ApiError("User not found", 404)
     }
+    if (!user.isActive) {
+        throw new ApiError("Account is deactivated", 403);
+    }
     if (!user.addresses || user.addresses.length === 0) {
         throw new ApiError("No addresses found", 404);
     }
     const address = user.addresses.id(addressId);
     if (!address) {
         throw new ApiError("Address not found", 404);
+    }
+    // Validate updated fields if provided
+    if (updateData.street !== undefined && !updateData.street?.trim()) {
+        throw new ApiError("Street cannot be empty", 400);
+    }
+    if (updateData.city !== undefined && !updateData.city?.trim()) {
+        throw new ApiError("City cannot be empty", 400);
+    }
+    if (updateData.state !== undefined && !updateData.state?.trim()) {
+        throw new ApiError("State cannot be empty", 400);
+    }
+    if (updateData.zipCode !== undefined && !updateData.zipCode?.trim()) {
+        throw new ApiError("Zip code cannot be empty", 400);
+    }
+    if (updateData.country !== undefined && !updateData.country?.trim()) {
+        throw new ApiError("Country cannot be empty", 400);
     }
     if (updateData.isDefault) {
         user.addresses.forEach((add) => {
@@ -163,6 +248,9 @@ export const deleteUserAddresses = async (userId: string, addressId: string) => 
     if (!user) {
         throw new ApiError("User not found", 404)
     }
+    if (!user.isActive) {
+        throw new ApiError("Account is deactivated", 403);
+    }
     if (!user.addresses || user.addresses.length === 0) {
         throw new ApiError("No addresses found", 404);
     }
@@ -180,32 +268,43 @@ export const deleteUserAddresses = async (userId: string, addressId: string) => 
     return;
 };
 
-export const changeUserPassword = async (userId: string, newPassword: string, currentPassword?: string, otp?: string) => {
+export const changeUserPassword = async (res:Response,userId: string, newPassword: string, currentPassword?: string, otp?: string) => {
+    // Check rate limiting first
+    await checkPasswordChangeAttempts(userId);
     const user = await userModel.findById(userId).select('+password');
     if (!user) {
         throw new ApiError("User not found", 404);
     }
+    if (!user.isActive) {
+        throw new ApiError("Account is deactivated", 403);
+    }
+
     const hasPassword = Boolean(user.password);
     if (user.isTwoFactorEnabled){
         if(!otp){
+            await recordPasswordChangeAttempt(userId);
             throw new ApiError("OTP is required",400)
         }
         const verified = speakeasy.totp.verify({
             secret: user.twoFactorSecret!,
             encoding: 'base32',
             token: otp,
-            window: 2})
+            window: 2
+        })
         if (!verified){
+            await recordPasswordChangeAttempt(userId);
             throw new ApiError("Invalid OTP",401);
         }
     }
 
     if(hasPassword){
         if(!currentPassword){
+            await recordPasswordChangeAttempt(userId);
             throw new ApiError("Current password is required", 400);
         }
         const isPasswordValid = await comparePassword(currentPassword,user.password);
         if(!isPasswordValid){
+            await recordPasswordChangeAttempt(userId);
             throw new ApiError("Current password is incorrect", 401);
         }
         const same = await comparePassword(newPassword,user.password);
@@ -213,19 +312,26 @@ export const changeUserPassword = async (userId: string, newPassword: string, cu
             throw new ApiError("New password must be different", 400);
         }
     }
-
+    // Validate new password strength
+    if (newPassword.length < 6) {
+        throw new ApiError("Password must be at least 6 characters", 400);
+    }
     user.password = await hashPassword(newPassword!);
     await user.save()
-
+    await RefreshTokenModel.deleteMany({ user: userId });
+    await generateRefreshToken(res, user._id.toString());
+    await clearPasswordChangeAttempts(userId);
     logger.info(`Password changed for user: ${user.email}`);
     return;
-
 };
 
 export const deleteUserAccount = async (res:Response,userId: string, password?: string, otp?: string) => {
     const user = await userModel.findById(userId).select('+password');
     if (!user) {
         throw new ApiError("User not found", 404);
+    }
+    if (!user.isActive) {
+        throw new ApiError("Account is already deactivated", 400);
     }
     const hasPassword = Boolean(user.password);
     if (user.isTwoFactorEnabled){
@@ -252,20 +358,26 @@ export const deleteUserAccount = async (res:Response,userId: string, password?: 
         }
     }
     const restoreToken = crypto.randomBytes(ACCOUNT_RESTORE_TOKEN_SIZE).toString('hex');
-    const restoreTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     const hashedToken = crypto.createHash('sha256').update(restoreToken).digest('hex');
-    const now = new Date(); 
+    const now = new Date();
+    const expiryDate = new Date(now.getTime() + ACCOUNT_RESTORE_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
     user.isActive = false;
     user.deletedAt = now;
-    user.deleteAfter = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    user.deleteAfter = expiryDate
     user.restoreToken = hashedToken;
-    user.restoreTokenExpiresAt = restoreTokenExpiresAt;
+    user.restoreTokenExpiresAt = expiryDate;
     await user.save();
     await RefreshTokenModel.deleteMany({ user: userId });
     const restoreLink = `${process.env.CLIENT_URL}/api/v1/users/account/restore/${restoreToken}`;
     const subject = "Restore your account";
     const html = accountRestoreRequestTemplate.replace('{restoreURL}',restoreLink);
-    await sendEmail({to:user.email,subject,html});
+    try {
+        await sendEmail({ to: user.email, subject, html });
+    } catch (error) {
+        logger.error('Failed to send account restore email:', error);
+        // Don't fail the deletion if email fails
+    }
     logger.info(`Account deleted for user: ${user.email}`);
     clearAuthCookies(res)
     return;
@@ -297,6 +409,12 @@ export const restoreUserAccount = async(token:string) => {
     const subject = "Account restored successfully";
     const loginUrl = `${process.env.CLIENT_URL}/api/v1/auth/login`;
     const html = accountRestoreSuccessTemplate.replace('{loginURL}', loginUrl);
-    await sendEmail({to:user.email,subject,html});
+    try {
+        await sendEmail({ to: user.email, subject, html });
+    } catch (error) {
+        logger.error('Failed to send account restore confirmation email:', error);
+        // Don't fail the restore if email fails
+    }
     logger.info(`Account restored for user: ${user.email}`);
+    return;
 };

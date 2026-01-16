@@ -64,8 +64,10 @@ export const getAddresses = async(req:AuthRequest,res:Response,next:NextFunction
 export const addAddresses = async(req:AuthRequest,res:Response,next:NextFunction)=>{
     try{
         const address = req.body.address;
-        if(!address){
-            throw new ApiError("Address data is required",400)
+        if (!address.street?.trim() || !address.city?.trim() ||
+            !address.state?.trim() || !address.zipCode?.trim() ||
+            !address.country?.trim()) {
+            throw new ApiError("All address fields are required", 400);
         }
         const userId = req.user._id.toString();
         const result = await userService.addUserAddresses(userId,address);
@@ -108,7 +110,7 @@ export const changePassword =  async(req:AuthRequest,res:Response,next:NextFunct
             throw new ApiError("New password is required", 400);
         }
         const userId = req.user._id.toString();
-        await userService.changeUserPassword(userId,newPassword,currentPassword,otp);
+        await userService.changeUserPassword(res,userId,newPassword,currentPassword,otp);
         successResponse(res, 200, 'Password changed successfully');
     }catch(error){
         next(error);
