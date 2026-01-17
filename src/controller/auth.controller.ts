@@ -51,6 +51,19 @@ export const isEmailVerified = async (req: Request, res: Response, next: NextFun
     }
 };
 
+export const resendVerifyEmail = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const email = req.body.email;
+        if (!email?.trim()) {
+            throw new ApiError("email is required", 400);
+        }
+        await authServices.resendVerificationEmail(email);
+        successResponse(res, 200, "If the email exists, a verification code has been sent");
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const login = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { email, password } = req.body;
@@ -173,9 +186,6 @@ export const disable2FA = async (req: AuthRequest, res: Response, next: NextFunc
     }
 };
 
-
-
-
 export const googleCallback = async (req: AuthRequest, res: Response, next: NextFunction) => {
 
     const user = req.user as any;
@@ -191,7 +201,6 @@ export const googleCallback = async (req: AuthRequest, res: Response, next: Next
         next(error)
     }
 };
-
 
 export const facebookCallback = async (req: AuthRequest, res: Response, next: NextFunction) => {
 

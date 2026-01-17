@@ -153,6 +153,36 @@ export const verifyEmail = async (verificationCode: string) => {
     }
 };
 
+export const resendVerificationEmail = async (email: string) => {
+    const user = await userModel.findOne({ email: email.toLowerCase() });
+    if (!user) {
+        // Don't reveal if user exists
+        return { message: "If the email exists, a verification code has been sent" };
+    }
+
+    if (user.isEmailVerified) {
+        throw new ApiError("Email is already verified", 400);
+    }
+    const verificationCode = generateVerificationCode();
+    const verificationCodeExpiresAt = Date.now() + VERIFICATION_CODE_EXPIRY;
+
+    user.verificationCode = verificationCode;
+    user.verificationCodeExpiresAt = verificationCodeExpiresAt;
+    await user.save();
+
+    // Send verification email
+    const html = verificationEmailTemplate.replace("{verificationCode}", verificationCode);
+    try {
+        await sendEmail({ to: user.email, subject: 'Verify your email', html });
+    } catch (error) {
+        logger.error('Failed to resend verification email:', error);
+        throw new ApiError("Failed to send verification email", 500);
+    }
+
+    logger.info(`Verification email resent to: ${user.email}`);
+    return;
+};
+
 export const loginUser = async (res: Response, email: string, password: string) => {
     // Check for too many failed attempts
     await checkFailedLoginAttempts(email.toLowerCase());

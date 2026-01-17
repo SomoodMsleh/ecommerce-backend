@@ -21,6 +21,12 @@ router.post('/verifyEmail',
     asyncHandler(authController.isEmailVerified)
 );
 
+router.post('/resendVerifyEmail',
+    ratelimiter({ windowMs: 15 * 60 * 1000, max: 5 }),
+    validation(authValidation.resendVerifyEmailSchema),
+    asyncHandler(authController.resendVerifyEmail)
+);
+
 router.post('/login',
      ratelimiter({ windowMs: 15 * 60 * 1000, max: 10, message: "Too many login attempts, please try again later" }),
     validation(authValidation.loginSchema),
