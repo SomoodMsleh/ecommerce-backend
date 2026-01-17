@@ -27,16 +27,8 @@ export interface IUser extends Document {
     facebookId?: string;
     avatar?: { secure_url: string, public_id?: string; };
     addresses?: Address[];
-    verificationCode?: string,
-    verificationCodeExpiresAt?: Date,
     isActive: boolean;
-    deletedAt?: Date;
-    deleteAfter?: Date;
-    restoreToken?: string;
-    restoreTokenExpiresAt?: Date;
     lastLogin?: Date;
-    resetPasswordToken?: string,
-    resetPasswordExpiresAt?: Date,
     createdAt: Date;
     updatedAt: Date;
 };
@@ -48,7 +40,8 @@ const userSchema: Schema<IUser> = new Schema({
         unique: true,
         minlength: [3, "Username must be at least 3 characters"],
         maxlength: [30, "Username cannot exceed 30 characters"],
-        trim: true
+        trim: true,
+        lowercase: true,
     },
     firstName: {
         type: String,
@@ -115,40 +108,18 @@ const userSchema: Schema<IUser> = new Schema({
         }],
         default: []
     },
-    verificationCode: {
-        type: String,
-        trim: true,
-        unique: true,
-        sparse: true
-    },
-    verificationCodeExpiresAt: {
-        type: Date,
-    },
     isActive: { type: Boolean, default: true },
-    deletedAt:{type: Date},
-    deleteAfter: {type: Date},
-    restoreToken: {
-        type: String,
-        trim: true,
-        unique: true,
-        sparse: true
-    },
-    restoreTokenExpiresAt:{
-        type: Date,
-    },
     lastLogin: { type: Date },
-    resetPasswordToken: {
-        type: String,
-        trim: true,
-        unique: true,
-        sparse: true
-    },
-    resetPasswordExpiresAt: {
-        type: Date,
-    }
 }, {
     timestamps: true,
 });
+
+// Add indexes for better performance
+userSchema.index({ email: 1 });
+// userSchema.index({ username: 1 });
+// userSchema.index({ googleId: 1 });
+// userSchema.index({ facebookId: 1 });
+
 
 const userModel = mongoose.models.User || model<IUser>("User", userSchema); // to avoid model overwrite issue in watch mode
 export default userModel;
