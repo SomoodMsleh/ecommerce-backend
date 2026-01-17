@@ -8,13 +8,13 @@ import speakeasy from "speakeasy";
 import { sendEmail } from "./email.service.js";
 import {accountRestoreRequestTemplate,accountRestoreSuccessTemplate} from "../emailTemplates/accountRestoreTemplate.js"
 import crypto from "node:crypto";
-import {clearAuthCookies} from "../utils/jwt.util.js";
+import {clearAuthCookies , generateRefreshToken} from "../utils/jwt.util.js";
 import { Response } from "express";
-import redisClient from "../config/redis.config.js";
-import { generateRefreshToken } from "../utils/jwt.util.js";
+import * as redisHelper from "../utils/redis.helper.js"
 
 const ACCOUNT_RESTORE_TOKEN_SIZE = 32;
 const ACCOUNT_RESTORE_EXPIRY_DAYS = 30;
+const MIN_PASSWORD_LENGTH = 6;
 interface UpdateProfileData {
     firstName?: string;
     lastName?: string;
@@ -30,33 +30,6 @@ interface AddressData {
     isDefault?: boolean;
 };
 
-// Helper to track password change attempts
-export const checkPasswordChangeAttempts = async (userId: string): Promise<void> => {
-    const key = `pwd_change:${userId}`;
-    const attempts = await redisClient.get(key);
-    
-    if (attempts && parseInt(attempts) >= 3) {
-        const ttl = await redisClient.ttl(key);
-        throw new ApiError(
-            `Too many password change attempts. Try again in ${Math.ceil(ttl / 60)} minutes`,
-            429
-        );
-    }
-};
-
-// Helper to record password change attempt
-export const recordPasswordChangeAttempt = async (userId: string): Promise<void> => {
-    const key = `pwd_change:${userId}`;
-    const current = await redisClient.incr(key);
-    
-    if (current === 1) {
-        await redisClient.expire(key, 60 * 60); // 1 hour
-    }
-};
-// Helper to clear password change attempts on success
-export const clearPasswordChangeAttempts = async (userId: string): Promise<void> => {
-    await redisClient.del(`pwd_change:${userId}`);
-};
 
 export const getUserProfile = async (userId: string) => {
     const user = await userModel.findById(userId).select('-password');
@@ -270,7 +243,7 @@ export const deleteUserAddresses = async (userId: string, addressId: string) => 
 
 export const changeUserPassword = async (res:Response,userId: string, newPassword: string, currentPassword?: string, otp?: string) => {
     // Check rate limiting first
-    await checkPasswordChangeAttempts(userId);
+    await redisHelper.checkPasswordChangeAttempts(userId);
     const user = await userModel.findById(userId).select('+password');
     if (!user) {
         throw new ApiError("User not found", 404);
@@ -282,9 +255,10 @@ export const changeUserPassword = async (res:Response,userId: string, newPasswor
     const hasPassword = Boolean(user.password);
     if (user.isTwoFactorEnabled){
         if(!otp){
-            await recordPasswordChangeAttempt(userId);
+            await redisHelper.recordPasswordChangeAttempt(userId);
             throw new ApiError("OTP is required",400)
         }
+        await redisHelper.checkFailed2FAAttempts(userId);
         const verified = speakeasy.totp.verify({
             secret: user.twoFactorSecret!,
             encoding: 'base32',
@@ -292,19 +266,21 @@ export const changeUserPassword = async (res:Response,userId: string, newPasswor
             window: 2
         })
         if (!verified){
-            await recordPasswordChangeAttempt(userId);
+            await redisHelper.recordFailed2FAAttempt(userId);
+            await redisHelper.recordPasswordChangeAttempt(userId);
             throw new ApiError("Invalid OTP",401);
         }
+        await redisHelper.clearFailed2FAAttempts(userId);
     }
 
     if(hasPassword){
         if(!currentPassword){
-            await recordPasswordChangeAttempt(userId);
+            await redisHelper.recordPasswordChangeAttempt(userId);
             throw new ApiError("Current password is required", 400);
         }
         const isPasswordValid = await comparePassword(currentPassword,user.password);
         if(!isPasswordValid){
-            await recordPasswordChangeAttempt(userId);
+            await redisHelper.recordPasswordChangeAttempt(userId);
             throw new ApiError("Current password is incorrect", 401);
         }
         const same = await comparePassword(newPassword,user.password);
@@ -313,14 +289,14 @@ export const changeUserPassword = async (res:Response,userId: string, newPasswor
         }
     }
     // Validate new password strength
-    if (newPassword.length < 6) {
-        throw new ApiError("Password must be at least 6 characters", 400);
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+        throw new ApiError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`, 400);
     }
     user.password = await hashPassword(newPassword!);
     await user.save()
     await RefreshTokenModel.deleteMany({ user: userId });
     await generateRefreshToken(res, user._id.toString());
-    await clearPasswordChangeAttempts(userId);
+    await redisHelper.clearPasswordChangeAttempts(userId);
     logger.info(`Password changed for user: ${user.email}`);
     return;
 };
@@ -338,14 +314,17 @@ export const deleteUserAccount = async (res:Response,userId: string, password?: 
         if(!otp){
             throw new ApiError("OTP is required",400)
         }
+        await redisHelper.checkFailed2FAAttempts(userId);
         const verified = speakeasy.totp.verify({
             secret: user.twoFactorSecret!,
             encoding: 'base32',
             token: otp,
             window: 2})
         if (!verified){
+            await redisHelper.recordFailed2FAAttempt(userId);
             throw new ApiError("Invalid OTP",401);
         }
+        await redisHelper.clearFailed2FAAttempts(userId);
     }
 
     if(hasPassword){
@@ -360,15 +339,17 @@ export const deleteUserAccount = async (res:Response,userId: string, password?: 
     const restoreToken = crypto.randomBytes(ACCOUNT_RESTORE_TOKEN_SIZE).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(restoreToken).digest('hex');
     const now = new Date();
-    const expiryDate = new Date(now.getTime() + ACCOUNT_RESTORE_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+    const deleteAfter = new Date(now.getTime() + ACCOUNT_RESTORE_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
+    // Store restore token and deletion data in Redis
+    await redisHelper.setAccountRestoreToken(userId, hashedToken, deleteAfter);
+    await redisHelper.setAccountDeletionData(userId, now, deleteAfter);
+
 
     user.isActive = false;
-    user.deletedAt = now;
-    user.deleteAfter = expiryDate
-    user.restoreToken = hashedToken;
-    user.restoreTokenExpiresAt = expiryDate;
     await user.save();
     await RefreshTokenModel.deleteMany({ user: userId });
+    
     const restoreLink = `${process.env.CLIENT_URL}/api/v1/users/account/restore/${restoreToken}`;
     const subject = "Restore your account";
     const html = accountRestoreRequestTemplate.replace('{restoreURL}',restoreLink);
@@ -389,23 +370,27 @@ export const restoreUserAccount = async(token:string) => {
         .update(token)
         .digest('hex');
 
-    const user = await userModel.findOne({
-        restoreToken: hashedToken,
-        restoreTokenExpiresAt: { $gt: new Date() },
-        isActive: false
-    });
+    const restoreData = await redisHelper.getAccountRestoreData(hashedToken);
+    if (!restoreData) {
+        throw new ApiError("Restore token is invalid or expired", 400);
+    }
+
+    const user = await userModel.findById(restoreData.userId);
 
     if (!user) {
         throw new ApiError("Restore token is invalid or expired", 400);
     }
+    if (user.isActive) {
+        throw new ApiError("Account is already active", 400);
+    }
 
     user.isActive = true;
-    user.deletedAt = undefined;
-    user.deleteAfter = undefined;
-    user.restoreToken = undefined;
-    user.restoreTokenExpiresAt = undefined;
-
     await user.save();
+
+    // Delete restore token and deletion data from Redis
+    await redisHelper.deleteAccountRestoreToken(hashedToken);
+    await redisHelper.deleteAccountDeletionData(restoreData.userId);
+
     const subject = "Account restored successfully";
     const loginUrl = `${process.env.CLIENT_URL}/api/v1/auth/login`;
     const html = accountRestoreSuccessTemplate.replace('{loginURL}', loginUrl);
