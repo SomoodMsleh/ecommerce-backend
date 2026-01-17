@@ -12,16 +12,12 @@ import RefreshTokenModel from "../models/RefreshToken.model.js";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
 import logger from "../utils/logger.util.js";
-import redisClient from "../config/redis.config.js";
+import * as redisHelper from "../utils/redis.helper.js";
 
 
 const VERIFICATION_CODE_LENGTH = 8;
-const VERIFICATION_CODE_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
-const PASSWORD_RESET_EXPIRY = 1 * 60 * 60 * 1000; // 1 hour
 const PASSWORD_RESET_TOKEN_SIZE = 32;
 const MIN_PASSWORD_LENGTH = 6;
-const FAILED_LOGIN_LIMIT = 5;
-const FAILED_LOGIN_WINDOW = 30 * 60;
 
 
 const generateVerificationCode = customAlphabet(
@@ -37,37 +33,6 @@ interface RegisterUserInput {
     lastName: string,
     phoneNumber?: string,
 }
-
-// Helper function to check failed login attempts
-export const checkFailedLoginAttempts = async (email: string): Promise<void> => {
-    const key = `failed_login:${email}`;
-    const attempts = await redisClient.get(key);
-    
-    if (attempts && parseInt(attempts) >= FAILED_LOGIN_LIMIT) {
-        const ttl = await redisClient.ttl(key);
-        throw new ApiError(
-            `Account temporarily locked. Too many failed login attempts. Try again in ${Math.ceil(ttl / 60)} minutes`,
-            429
-        );
-    }
-};
-
-// Helper function to record failed login
-export const recordFailedLogin = async (email: string): Promise<void> => {
-    const key = `failed_login:${email}`;
-    const current = await redisClient.incr(key);
-    
-    if (current === 1) {
-        // Set 30 minute expiration on first failed attempt
-        await redisClient.expire(key, FAILED_LOGIN_WINDOW);
-    }
-};
-
-// Helper function to clear failed login attempts
-export const clearFailedLoginAttempts = async (email: string): Promise<void> => {
-    await redisClient.del(`failed_login:${email}`);
-};
-
 
 export const registerUser = async (userData: RegisterUserInput) => {
     const existingUser = await userModel.findOne({
@@ -91,15 +56,13 @@ export const registerUser = async (userData: RegisterUserInput) => {
     }
     const hashedPassword = await hashPassword(userData.password);
     const verificationCode = generateVerificationCode();
-    const verificationCodeExpiresAt = Date.now() + VERIFICATION_CODE_EXPIRY;
+    await redisHelper.setVerificationCode(userData.email.toLowerCase(),verificationCode);
     // Create user
     const user = await userModel.create({ 
         ...userData,
         username: userData.username.toLowerCase(),
         email: userData.email.toLowerCase(),
-        password: hashedPassword, 
-        verificationCode, 
-        verificationCodeExpiresAt 
+        password: hashedPassword,  
     });
     const html = verificationEmailTemplate.replace("{verificationCode}", verificationCode);
     try {
@@ -122,7 +85,12 @@ export const registerUser = async (userData: RegisterUserInput) => {
 
 
 export const verifyEmail = async (verificationCode: string) => {
-    const user = await userModel.findOne({ verificationCode, verificationCodeExpiresAt: { $gt: Date.now() } });
+    // Get email associated with this verification code
+    const email = await redisHelper.getVerificationCode(verificationCode);
+    if (!email) {
+        throw new ApiError("Invalid or expired verification code", 400);
+    }
+    const user = await userModel.findOne({email:email.toLowerCase()});
     if (!user) {
         throw new ApiError("Invalid or expired verification code", 400);
     }
@@ -130,11 +98,9 @@ export const verifyEmail = async (verificationCode: string) => {
         throw new ApiError("Email is already verified", 400);
     }
     user.isEmailVerified = true;
-    user.verificationCode = undefined;
-    user.verificationCodeExpiresAt = undefined;
-
     await user.save();
-
+    // Delete verification code from Redis
+    await redisHelper.deleteVerificationCode(email);
     const subject = `Welcome to ${process.env.APP_NAME} - Email Verified Successfully`;
     const html = welcomeEmailTemplate(user.username);
     try {
@@ -164,11 +130,8 @@ export const resendVerificationEmail = async (email: string) => {
         throw new ApiError("Email is already verified", 400);
     }
     const verificationCode = generateVerificationCode();
-    const verificationCodeExpiresAt = Date.now() + VERIFICATION_CODE_EXPIRY;
-
-    user.verificationCode = verificationCode;
-    user.verificationCodeExpiresAt = verificationCodeExpiresAt;
-    await user.save();
+    // Store new verification code in Redis (overwrites old one)
+    await redisHelper.setVerificationCode(email.toLowerCase(), verificationCode);
 
     // Send verification email
     const html = verificationEmailTemplate.replace("{verificationCode}", verificationCode);
@@ -185,11 +148,11 @@ export const resendVerificationEmail = async (email: string) => {
 
 export const loginUser = async (res: Response, email: string, password: string) => {
     // Check for too many failed attempts
-    await checkFailedLoginAttempts(email.toLowerCase());
+    await redisHelper.checkFailedLoginAttempts(email.toLowerCase());
     
     const user = await userModel.findOne({ emil:email.toLowerCase() }).select('+password');
     if (!user || !user.password) {
-        await recordFailedLogin(email.toLowerCase());
+        await redisHelper.recordFailedLogin(email.toLowerCase());
         throw new ApiError("Invalid credentials", 401);
     }
     
@@ -203,12 +166,12 @@ export const loginUser = async (res: Response, email: string, password: string) 
     
     const isPasswordValid = await comparePassword(password, user.password);
     if (!isPasswordValid) {
-        await recordFailedLogin(email.toLowerCase());
+        await redisHelper.recordFailedLogin(email.toLowerCase());
         throw new ApiError("Invalid credentials", 401);
     }
     
     // Clear failed attempts on successful login
-    await clearFailedLoginAttempts(email.toLowerCase());
+    await redisHelper.clearFailedLoginAttempts(email.toLowerCase());
 
     if (user.isTwoFactorEnabled && user.twoFactorSecret) {
         return {
@@ -251,10 +214,8 @@ export const userForgetPassword = async (email: string) => {
 
     const resetToken = crypto.randomBytes(PASSWORD_RESET_TOKEN_SIZE).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-    user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpiresAt = Date.now() + PASSWORD_RESET_EXPIRY;
-
-    await user.save();
+    // Store reset token in Redis
+    await redisHelper.setPasswordResetToken(user.email, hashedToken);
     const resetURL = `${process.env.CLIENT_URL}/api/v1/auth/resetPassword/${resetToken}`;
     const subject = "Reset your password";
     const html = passwordResetRequestTemplate.replace("{resetURL}", resetURL);
@@ -271,7 +232,12 @@ export const userForgetPassword = async (email: string) => {
 
 export const userResetPassword = async (token: string, password: string) => {
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
-    const user = await userModel.findOne({ resetPasswordToken: hashedToken, resetPasswordExpiresAt: { $gt: Date.now() } }).select("+password");
+    // Get email from Redis
+    const email = await redisHelper.getPasswordResetEmail(hashedToken);
+    if (!email) {
+        throw new ApiError("Invalid or expired reset token", 400);
+    }
+    const user = await userModel.findOne({email}).select("+password");
     if (!user) {
         throw new ApiError("Invalid or expired reset token", 400)
     }
@@ -292,9 +258,9 @@ export const userResetPassword = async (token: string, password: string) => {
         }
     }
     user.password = await hashPassword(password);
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpiresAt = undefined;
     await user.save();
+    // Delete reset token from Redis
+    await redisHelper.deletePasswordResetToken(hashedToken);
     await RefreshTokenModel.deleteMany({ user: user._id });
     logger.info(`Password reset completed for user: ${user.email}`);
     return;
@@ -353,6 +319,7 @@ export const enable2FA = async (userId: string) => {
 };
 
 export const verify2FA = async (userId: string, token: string) => {
+    await redisHelper.checkFailed2FAAttempts(userId);
     const user = await userModel.findById(userId);
     if (!user) {
         throw new ApiError("User not found", 404);
@@ -374,6 +341,7 @@ export const verify2FA = async (userId: string, token: string) => {
         window: 2 //  Allow a ±60s time drift to handle small clock differences between server and authenticator
     });
     if (!verified) {
+        await redisHelper.recordFailed2FAAttempt(userId);
         throw new ApiError("Invalid 2FA token", 400);
     }
     user.isTwoFactorEnabled = true;
@@ -385,6 +353,7 @@ export const verify2FA = async (userId: string, token: string) => {
 };
 
 export const verify2FALogin = async (res: Response, userId: string, otp: string) => {
+    await redisHelper.checkFailed2FAAttempts(userId);
     const user = await userModel.findById(userId);
     if (!user) {
         throw new ApiError("User not found", 404);
@@ -402,9 +371,10 @@ export const verify2FALogin = async (res: Response, userId: string, otp: string)
         window: 2 //  Allow a ±60s time drift to handle small clock differences between server and authenticator
     });
     if (!verified) {
+        await redisHelper.recordFailed2FAAttempt(userId);
         throw new ApiError("Invalid 2FA token", 400);
     }
-
+    await redisHelper.clearFailed2FAAttempts(userId);
     user.lastLogin = Date.now();
     await user.save();
 
@@ -451,6 +421,7 @@ export const disable2FA = async (userId: string, password?: string, otp?: string
     if (!otp) {
         throw new ApiError("2FA code is required to disable 2FA", 400);
     }
+    await redisHelper.checkFailed2FAAttempts(userId);
     const verified = speakeasy.totp.verify({
         secret: user.twoFactorSecret,
         encoding: 'base32',
@@ -458,9 +429,10 @@ export const disable2FA = async (userId: string, password?: string, otp?: string
         window: 2
     });
     if (!verified) {
+        await redisHelper.recordFailed2FAAttempt(userId);
         throw new ApiError("Invalid 2FA code", 400);
     }
-
+    await redisHelper.clearFailed2FAAttempts(userId);
     user.isTwoFactorEnabled = false;
     user.twoFactorSecret = undefined;
     user.twoFactorTempSecret = undefined;
