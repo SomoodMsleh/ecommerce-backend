@@ -1,5 +1,5 @@
 import redisClient from "../config/redis.config.js";
-
+import ApiError from "./error.util.js";
 // Time constants (in seconds)
 export const REDIS_TTL = {
     VERIFICATION_CODE: 24 * 60 * 60, // 24 hours
@@ -19,36 +19,57 @@ export const REDIS_LIMITS = {
 
 // ==================== VERIFICATION CODE ====================
 export const setVerificationCode = async (email: string, code: string): Promise<void> => {
-    const key = `verify:${email}`;
-    await redisClient.setex(key, REDIS_TTL.VERIFICATION_CODE, code);
+    // First, delete any existing verification code for this email
+    await deleteVerificationCodeByEmail(email);
+    
+    // Store code -> email mapping
+    const key = `verify_code:${code}`;
+    await redisClient.setex(key, REDIS_TTL.VERIFICATION_CODE, email);
+    
+    // Store email -> code mapping for easy lookup/deletion
+    const emailKey = `verify_email:${email}`;
+    await redisClient.setex(emailKey, REDIS_TTL.VERIFICATION_CODE, code);
 };
 
 export const getVerificationCode = async (code: string): Promise<string | null> => {
-    const keys = await redisClient.keys(`verify:*`);
-    for (const key of keys) {
-        const storedCode = await redisClient.get(key);
-        if (storedCode === code) {
-            const email = key.replace('verify:', '');
-            return email;
-        }
-    }
-    return null;
+    const key = `verify_code:${code}`;
+    return await redisClient.get(key);
 };
 
-export const deleteVerificationCode = async (email: string): Promise<void> => {
-    const key = `verify:${email}`;
-    await redisClient.del(key);
+export const deleteVerificationCode = async (code: string): Promise<void> => {
+    // Get email associated with this code
+    const email = await redisClient.get(`verify_code:${code}`);
+    
+    if (email) {
+        // Delete both mappings
+        await redisClient.del(`verify_code:${code}`);
+        await redisClient.del(`verify_email:${email}`);
+    }
+};
+
+export const deleteVerificationCodeByEmail = async (email: string): Promise<void> => {
+    // Get code associated with this email
+    const code = await redisClient.get(`verify_email:${email}`);
+    
+    if (code) {
+        // Delete both mappings
+        await redisClient.del(`verify_code:${code}`);
+        await redisClient.del(`verify_email:${email}`);
+    }
 };
 
 // ==================== PASSWORD RESET TOKEN ====================
-export const setPasswordResetToken = async (email: string, hashedToken: string): Promise<void> => {
+export const setPasswordResetToken = async (email: string,userId:string, hashedToken: string): Promise<void> => {
     const key = `pwd_reset:${hashedToken}`;
-    await redisClient.setex(key, REDIS_TTL.PASSWORD_RESET, email);
+    await redisClient.setex(key, REDIS_TTL.PASSWORD_RESET, JSON.stringify({ email, userId }));
 };
 
-export const getPasswordResetEmail = async (hashedToken: string): Promise<string | null> => {
+export const getPasswordResetData = async (hashedToken: string):  Promise<{ email: string; userId: string } | null>  => {
     const key = `pwd_reset:${hashedToken}`;
-    return await redisClient.get(key);
+    const data = await redisClient.get(key);
+    if (!data) return null;
+    const parsedData = JSON.parse(data) as { email: string; userId: string };
+    return parsedData;
 };
 
 export const deletePasswordResetToken = async (hashedToken: string): Promise<void> => {
@@ -118,7 +139,6 @@ export const deleteAccountDeletionData = async (userId: string): Promise<void> =
 };
 
 
-
 // ==================== FAILED LOGIN ATTEMPTS ====================
 export const checkFailedLoginAttempts = async (email: string): Promise<void> => {
     const key = `failed_login:${email}`;
@@ -126,9 +146,11 @@ export const checkFailedLoginAttempts = async (email: string): Promise<void> => 
 
     if (attempts && parseInt(attempts) >= REDIS_LIMITS.FAILED_LOGIN) {
         const ttl = await redisClient.ttl(key);
-        throw new Error(
-            `Account temporarily locked. Too many failed login attempts. Try again in ${Math.ceil(ttl / 60)} minutes`
+        throw new ApiError(
+            `Account temporarily locked. Too many failed login attempts. Try again in ${Math.ceil(ttl / 60)} minutes`,
+            429
         );
+
     }
 };
 
@@ -152,8 +174,9 @@ export const checkFailed2FAAttempts = async (userId: string): Promise<void> => {
 
     if (attempts && parseInt(attempts) >= REDIS_LIMITS.FAILED_2FA) {
         const ttl = await redisClient.ttl(key);
-        throw new Error(
-            `Too many failed 2FA attempts. Try again in ${Math.ceil(ttl / 60)} minutes`
+        throw new ApiError(
+            `Too many failed 2FA attempts. Try again in ${Math.ceil(ttl / 60)} minutes`,
+            429
         );
     }
 };
@@ -178,8 +201,9 @@ export const checkPasswordChangeAttempts = async (userId: string): Promise<void>
 
     if (attempts && parseInt(attempts) >= REDIS_LIMITS.PASSWORD_CHANGE) {
         const ttl = await redisClient.ttl(key);
-        throw new Error(
-            `Too many password change attempts. Try again in ${Math.ceil(ttl / 60)} minutes`
+        throw new ApiError(
+            `Too many password change attempts. Try again in ${Math.ceil(ttl / 60)} minutes`,
+            429
         );
     }
 };

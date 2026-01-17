@@ -4,8 +4,6 @@ import * as authServices from '../services/auth.service.js';
 import { AuthRequest } from "../middlewares/auth.middleware.js"
 import ApiError from "../utils/error.util.js";
 
-
-
 export const register = async (req: Request, res: Response, next: NextFunction) => {
     try {
         // Validate input
@@ -42,8 +40,8 @@ export const isEmailVerified = async (req: Request, res: Response, next: NextFun
     try {
         const verificationCode = req.body.verificationCode;
         if (!verificationCode?.trim()) {
-                throw new ApiError("Verification code is required", 400);
-            }
+            throw new ApiError("Verification code is required", 400);
+        }
         const result = await authServices.verifyEmail(verificationCode);
         successResponse(res, 200, "Email verified successfully. You can now login.", result);
     } catch (error) {
@@ -73,6 +71,9 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
         const result = await authServices.loginUser(res, email, password);
         successResponse(res, 200, "Logged in successfully", result);
     } catch (error) {
+        if (error instanceof Error && error.message.includes("temporarily locked")) {
+            return next(new ApiError(error.message, 429));
+        }
         next(error);
     }
 };
@@ -150,6 +151,9 @@ export const verify2FA = async (req: AuthRequest, res: Response, next: NextFunct
         const result = await authServices.verify2FA(userId, token);
         successResponse(res, 200, '2FA verified successfully', result);
     } catch (error) {
+        if (error instanceof Error && error.message.includes("Too many failed 2FA attempts")) {
+            return next(new ApiError(error.message, 429));
+        }
         next(error)
     }
 };
@@ -167,6 +171,9 @@ export const verify2FALogin = async (req: Request, res: Response, next: NextFunc
         const result = await authServices.verify2FALogin(res, userId, token);
         successResponse(res, 200, "Login successful", result);
     } catch (error) {
+        if (error instanceof Error && error.message.includes("Too many failed 2FA attempts")) {
+            return next(new ApiError(error.message, 429));
+        }
         next(error)
     }
 };
@@ -182,6 +189,9 @@ export const disable2FA = async (req: AuthRequest, res: Response, next: NextFunc
         const result = await authServices.disable2FA(userId, password, otp);
         successResponse(res, 200, '2FA disabled successfully', result);
     } catch (error) {
+        if (error instanceof Error && error.message.includes("Too many failed 2FA attempts")) {
+            return next(new ApiError(error.message, 429));
+        }
         next(error)
     }
 };
@@ -190,14 +200,14 @@ export const googleCallback = async (req: AuthRequest, res: Response, next: Next
 
     const user = req.user as any;
     if (!user) {
-        throw new ApiError("OAuth authentication failed",401)
+        throw new ApiError("OAuth authentication failed", 401)
     }
 
     try {
-        const result = await authServices.handleOAuthSuccess(req,res,user);
+        const result = await authServices.handleOAuthSuccess(req, res, user);
 
-        successResponse(res, 200, 'Google OAuth successful',result);
-    }catch (error) {
+        successResponse(res, 200, 'Google OAuth successful', result);
+    } catch (error) {
         next(error)
     }
 };
@@ -206,14 +216,14 @@ export const facebookCallback = async (req: AuthRequest, res: Response, next: Ne
 
     const user = req.user as any;
     if (!user) {
-        throw new ApiError("OAuth authentication failed",401)
+        throw new ApiError("OAuth authentication failed", 401)
     }
 
     try {
-        const result = await authServices.handleOAuthSuccess(req,res,user);
+        const result = await authServices.handleOAuthSuccess(req, res, user);
 
-        successResponse(res, 200, 'Facebook OAuth successful',result);
-    }catch (error) {
+        successResponse(res, 200, 'Facebook OAuth successful', result);
+    } catch (error) {
         next(error)
     }
 };

@@ -100,7 +100,7 @@ export const verifyEmail = async (verificationCode: string) => {
     user.isEmailVerified = true;
     await user.save();
     // Delete verification code from Redis
-    await redisHelper.deleteVerificationCode(email);
+    await redisHelper.deleteVerificationCode(verificationCode);
     const subject = `Welcome to ${process.env.APP_NAME} - Email Verified Successfully`;
     const html = welcomeEmailTemplate(user.username);
     try {
@@ -130,6 +130,7 @@ export const resendVerificationEmail = async (email: string) => {
         throw new ApiError("Email is already verified", 400);
     }
     const verificationCode = generateVerificationCode();
+    
     // Store new verification code in Redis (overwrites old one)
     await redisHelper.setVerificationCode(email.toLowerCase(), verificationCode);
 
@@ -215,7 +216,7 @@ export const userForgetPassword = async (email: string) => {
     const resetToken = crypto.randomBytes(PASSWORD_RESET_TOKEN_SIZE).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
     // Store reset token in Redis
-    await redisHelper.setPasswordResetToken(user.email, hashedToken);
+    await redisHelper.setPasswordResetToken(user.email,user._id, hashedToken);
     const resetURL = `${process.env.CLIENT_URL}/api/v1/auth/resetPassword/${resetToken}`;
     const subject = "Reset your password";
     const html = passwordResetRequestTemplate.replace("{resetURL}", resetURL);
@@ -233,7 +234,12 @@ export const userForgetPassword = async (email: string) => {
 export const userResetPassword = async (token: string, password: string) => {
     const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
     // Get email from Redis
-    const email = await redisHelper.getPasswordResetEmail(hashedToken);
+    const data = await redisHelper.getPasswordResetData(hashedToken);
+
+    if (!data) {
+        throw new Error("Invalid or expired token");
+    }
+    const { email, userId } = data;
     if (!email) {
         throw new ApiError("Invalid or expired reset token", 400);
     }
