@@ -114,11 +114,6 @@ const userSchema: Schema<IUser> = new Schema({
     timestamps: true,
 });
 
-// Add indexes for better performance
-userSchema.index({ email: 1 });
-// userSchema.index({ username: 1 });
-// userSchema.index({ googleId: 1 });
-// userSchema.index({ facebookId: 1 });
 
 
 const userModel = mongoose.models.User || model<IUser>("User", userSchema); // to avoid model overwrite issue in watch mode

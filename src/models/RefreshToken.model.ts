@@ -29,7 +29,5 @@ const RefreshTokenSchema : Schema<IRefreshToken> = new Schema({
     }
 });
 
-RefreshTokenSchema.index({token: 1}); // Index for faster lookup by token
-RefreshTokenSchema.index({expiresAt: 1} , {expireAfterSeconds: 0}); // TTL index to auto-remove expired tokens 
 const RefreshTokenModel = mongoose.models.RefreshToken || model<IRefreshToken>('RefreshToken', RefreshTokenSchema);
 export default RefreshTokenModel;

@@ -8,11 +8,6 @@ const PORT = process.env.PORT || 3000;
 const startServer  = async():Promise<void> => {
     try{
         await connectDB(); 
-        try {
-            await redisClient.connect();
-        } catch (err) {
-            logger.warn("⚠️ Redis unavailable, continuing without cache");
-        }
 
         app.listen(PORT,()=>{
             logger.info(`🚀 server is running on http://localhost:${PORT} ....`);

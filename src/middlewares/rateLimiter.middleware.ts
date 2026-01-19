@@ -1,7 +1,7 @@
 import { rateLimit } from "express-rate-limit";
 import redisClient from "../config/redis.config.js";
 import { Request, Response} from "express";
-import RedisStore from 'rate-limit-redis'
+import {RedisStore, type RedisReply} from 'rate-limit-redis'
 
 // Interface to customize rate limiter options
 interface RateLimiterOptions {
@@ -45,12 +45,10 @@ const ratelimiter = (options: RateLimiterOptions = {}) => {
         // =======================
         // Custom Redis Store
         // =======================
-        // Use RedisStore for distributed rate limiting
         store: new RedisStore({
-            // @ts-expect-error - Redis client compatibility
-            client: redisClient,
-            prefix: "rl:", // Prefix for Redis keys
-        }),
+		sendCommand: (command: string, ...args: string[]) =>
+			redisClient.call(command, ...args) as Promise<RedisReply>,
+	}),
     });
 };
 

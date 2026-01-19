@@ -33,12 +33,19 @@ const redisClient = new Redis({
 
 // Triggered when Redis connects successfully
 redisClient.on("connect", () => {
-    logger.info("✅ Redis connected successfully");
+    logger.info("🔌 Redis connecting...");
 });
 
-// Triggered when a Redis error occurs
-redisClient.on("error", (error) => {
-    logger.error("❌ Redis connection error:", error);
+redisClient.on("ready", () => {
+    logger.info("✅ Redis ready");
+});
+
+redisClient.on("error", (err) => {
+    logger.warn("⚠️ Redis error:", err.message);
+});
+
+redisClient.on("end", () => {
+    logger.warn("🔴 Redis connection closed");
 });
 
 // =======================

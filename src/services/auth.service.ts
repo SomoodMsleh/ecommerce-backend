@@ -237,7 +237,7 @@ export const userResetPassword = async (token: string, password: string) => {
     const data = await redisHelper.getPasswordResetData(hashedToken);
 
     if (!data) {
-        throw new Error("Invalid or expired token");
+        throw new ApiError("Invalid or expired token",400);
     }
     const { email, userId } = data;
     if (!email) {
