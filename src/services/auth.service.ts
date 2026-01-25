@@ -13,6 +13,7 @@ import speakeasy from "speakeasy";
 import QRCode from "qrcode";
 import logger from "../utils/logger.util.js";
 import * as redisHelper from "../utils/redis.helper.js";
+import { create } from "node:domain";
 
 
 const VERIFICATION_CODE_LENGTH = 8;
@@ -63,6 +64,8 @@ export const registerUser = async (userData: RegisterUserInput) => {
         username: userData.username.toLowerCase(),
         email: userData.email.toLowerCase(),
         password: hashedPassword,  
+        updatedAt: new Date(),
+        createdAt: new Date(),
     });
     const html = verificationEmailTemplate.replace("{verificationCode}", verificationCode);
     try {
@@ -98,6 +101,7 @@ export const verifyEmail = async (verificationCode: string) => {
         throw new ApiError("Email is already verified", 400);
     }
     user.isEmailVerified = true;
+    user.updatedAt = new Date();
     await user.save();
     // Delete verification code from Redis
     await redisHelper.deleteVerificationCode(verificationCode);
@@ -264,6 +268,7 @@ export const userResetPassword = async (token: string, password: string) => {
         }
     }
     user.password = await hashPassword(password);
+    user.updatedAt = new Date();
     await user.save();
     // Delete reset token from Redis
     await redisHelper.deletePasswordResetToken(hashedToken);
@@ -314,6 +319,7 @@ export const enable2FA = async (userId: string) => {
         issuer: process.env.APP_NAME || 'EcommerceApp'
     });
     user.twoFactorTempSecret = secret.base32;
+    user.updatedAt = new Date();
     await user.save();
 
     const qrImage = await QRCode.toDataURL(secret.otpauth_url!);
@@ -353,6 +359,7 @@ export const verify2FA = async (userId: string, token: string) => {
     user.isTwoFactorEnabled = true;
     user.twoFactorSecret = user.twoFactorTempSecret;
     user.twoFactorTempSecret = undefined;
+    user.updatedAt = new Date();
     await user.save()
     logger.info(`2FA enabled for user: ${user.email}`);
     return { message: "Two-factor authentication enabled successfully"  };
@@ -442,6 +449,7 @@ export const disable2FA = async (userId: string, password?: string, otp?: string
     user.isTwoFactorEnabled = false;
     user.twoFactorSecret = undefined;
     user.twoFactorTempSecret = undefined;
+    user.updatedAt = new Date();
     await user.save();
     logger.info(`2FA disabled for user: ${user.email}`);
     return { message: "Two-factor authentication disabled successfully"};

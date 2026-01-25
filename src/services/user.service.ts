@@ -75,7 +75,7 @@ export const updateUserProfile = async (userId: string, updateData: UpdateProfil
     if (updateData.phoneNumber) {
         user.phoneNumber = updateData.phoneNumber.trim();
     }
-
+    user.updatedAt = new Date();
     await user.save();
     logger.info(`User profile updated: ${user.email}`);
     return await userModel.findById(userId).select('-password');
@@ -101,6 +101,7 @@ export const updateUserAvatar = async (userId: string, buffer: Buffer) => {
     try {
         const { secure_url, public_id } = await uploadToCloudinary(buffer, `${process.env.APP_NAME}/users/avatar/${user._id.toString()}`);
         user.avatar = { secure_url, public_id };
+        user.updatedAt = new Date();
         await user.save();
         logger.info(`Avatar updated for user: ${user.email}`);
         return { avatar: user.avatar.secure_url };
@@ -130,7 +131,8 @@ export const deleteUserAvatar = async (userId: string) => {
         }
     }
     user.avatar = undefined;
-    user.save();
+    user.updatedAt = new Date();
+    await user.save();
     logger.info(`Avatar deleted for user: ${user.email}`);
     return;
 };
@@ -168,6 +170,7 @@ export const addUserAddresses = async (userId: string, addressData: AddressData)
         addressData.isDefault = true;
     }
     user.addresses.push(addressData);
+    user.updatedAt = new Date();
     await user.save();
     logger.info(`Address added for user: ${user.email}`);
     return user.addresses[user.addresses.length - 1];
@@ -211,6 +214,7 @@ export const updateUserAddresses = async (userId: string, addressId: string, upd
     }
     console.log(address)
     Object.assign(address, updateData);
+    user.updatedAt = new Date();
     await user.save();
     logger.info(`Address updated for user: ${user.email}`);
     return address;
@@ -236,6 +240,7 @@ export const deleteUserAddresses = async (userId: string, addressId: string) => 
     if (wasDefault && user.addresses.length > 0) {
         user.addresses[0].isDefault = true;
     }
+    user.updatedAt = new Date();
     await user.save();
     logger.info(`Address deleted for user: ${user.email}`);
     return;
@@ -293,6 +298,7 @@ export const changeUserPassword = async (res:Response,userId: string, newPasswor
         throw new ApiError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`, 400);
     }
     user.password = await hashPassword(newPassword!);
+    user.updatedAt = new Date();
     await user.save()
     await RefreshTokenModel.deleteMany({ user: userId });
     await generateRefreshToken(res, user._id.toString());
@@ -347,6 +353,7 @@ export const deleteUserAccount = async (res:Response,userId: string, password?: 
 
 
     user.isActive = false;
+    user.updatedAt = new Date();
     await user.save();
     await RefreshTokenModel.deleteMany({ user: userId });
     
@@ -385,6 +392,7 @@ export const restoreUserAccount = async(token:string) => {
     }
 
     user.isActive = true;
+    user.updatedAt = new Date();
     await user.save();
 
     // Delete restore token and deletion data from Redis
