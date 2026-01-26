@@ -65,13 +65,7 @@ async function cleanupUserRedisKeys (userId:string, email:string) :Promise<void>
             `failed_2fa:${userId}`,
             `pwd_change:${userId}`
         ]
-        for (const key of keysToDelete){
-            try{
-                await redisClient.del(key);
-            }catch(error){
-                logger.debug(`Could not delete Redis key ${key}:`, error);
-            }
-        }
+        await redisClient.del(...keysToDelete);
         logger.debug(`🧹 Cleaned up Redis keys for user: ${email}`);
     }catch(error){
         logger.error(`Failed to cleanup Redis keys for user ${email}:`, error);
@@ -89,22 +83,12 @@ export const cleanupExpiredRedisData = async ():Promise<void> =>{
             passwordChanges: 0,
         }
         try{
-            const verifyEmailKeys = await scanKeys("verify_email:*");
-            stats.verificationCodes = verifyEmailKeys.length;
+            stats.verificationCodes = await countRedisKeys("verify_email:*");
+            stats.failedLogins      = await countRedisKeys("failed_login:*");
+            stats.failed2FA         = await countRedisKeys("failed_2fa:*");
+            stats.passwordChanges   = await countRedisKeys("pwd_change:*");
 
-            const failedLoginKeys = await scanKeys("failed_login:*");
-            stats.failedLogins = failedLoginKeys.length;
-
-            // Failed 2FA attempts
-            const failed2FAKeys = await scanKeys("failed_2fa:*");
-            stats.failed2FA = failed2FAKeys.length;
-
-            // Password change attempts
-            const pwdChangeKeys = await scanKeys("pwd_change:*");
-            stats.passwordChanges = pwdChangeKeys.length;
-
-            
-            logger.info(`📊 Redis Stats:`);
+            logger.info("📊 Redis Stats:");
             logger.info(`   Verification codes: ${stats.verificationCodes}`);
             logger.info(`   Failed logins: ${stats.failedLogins}`);
             logger.info(`   Failed 2FA: ${stats.failed2FA}`);
@@ -118,15 +102,15 @@ export const cleanupExpiredRedisData = async ():Promise<void> =>{
     }
 };
 
-async function scanKeys(pattern:string):Promise<string[]>{
-    const Keys:string[] = [];
+async function countRedisKeys(pattern:string):Promise<number>{
     let cursor = 0;
+    let count = 0;
     do{
-        const result = await redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
-        cursor = parseInt(result[0]);
-        Keys.push(...result[1]);
+        const [nextCursor, keys] = await redisClient.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        cursor = parseInt(nextCursor);
+        count += keys.length;
     } while (cursor !== 0);
-    return Keys;
+    return count;
 }
 
 export const scheduleAccountCleanup = (): void => {
