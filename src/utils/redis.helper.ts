@@ -113,7 +113,7 @@ export const setAccountDeletionData = async (
     deleteAfter: Date
 ): Promise<void> => {
     const key = `deleted:${userId}`;
-    const data = JSON.stringify({
+    const data = JSON.stringify({  // JSON.stringify convert object in js to json 
         deletedAt: deletedAt.toISOString(),
         deleteAfter: deleteAfter.toISOString(),
     });
