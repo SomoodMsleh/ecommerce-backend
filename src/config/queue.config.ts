@@ -21,6 +21,23 @@ export const emailQueue = new Queue("email", {
     }
 });
 
+export const orderQueue = new Queue('order', {
+    redis: {
+        host: process.env.REDIS_HOST || '127.0.0.1',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+        password: process.env.REDIS_PASSWORD || undefined
+    },
+    defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+            type: 'exponential',
+            delay: 2000
+        },
+        removeOnComplete: true,
+        removeOnFail: false
+    }
+});
+
 // Email Queue Processor
 emailQueue.process(async (job)=>{
     const { to, subject, html } = job.data;
@@ -30,13 +47,28 @@ emailQueue.process(async (job)=>{
     await sendEmail({to, subject, html});
 });
 
+// Order Queue Processor
+orderQueue.process(async (job) => {
+    const { orderId, action } = job.data;
+    logger.info(`🔄 Processing order ${orderId} - ${action}`);
+});
+
+
 // Event listeners for logging
 emailQueue.on("completed", (job) => {
     logger.info(`📧 Email job ${job.id} completed successfully`);
 });
+// order listeners 
+orderQueue.on('completed', (job) => {
+    logger.info(`✅ Order job ${job.id} completed successfully`);
+});
 // Error handlers
 emailQueue.on("failed", (job, err)=>{
     logger.error(`❌ Email job ${job.id} failed:`, err);
+});
+
+orderQueue.on('failed', (job, err) => {
+    logger.error(`❌ Order job ${job.id} failed:`, err);
 });
 
 
