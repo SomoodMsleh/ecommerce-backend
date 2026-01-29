@@ -61,7 +61,16 @@ const cartSchema: Schema<ICart> = new Schema({
     }
 }, { timestamps: true });
 
+// pre method used to perform operations before saving
+cartSchema.pre("save", function(this:ICart){  //save executed before saving data in database , this:ICart refers to current cart document
+    this.totalAmount = this.items.reduce( // reduce method converts array into single value 
+        (sum, item) => sum + item.price * item.quantity, // calculating total amount
+        0 // initial value for sum is 0 
+    );
+})
+
 cartSchema.index({ user: 1 });
+cartSchema.index({ "items.product": 1 }); // index on items.product for faster lookups
 
 const cartModel = mongoose.models.Cart || model<ICart>('Cart', cartSchema);
 export default cartModel;
